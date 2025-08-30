@@ -39,7 +39,8 @@
 									<listOptionValue builtIn="false" value="/home/mgi/Data/github/can/libcanard/libcanard"/>
 									<listOptionValue builtIn="false" value="/home/mgi/Data/github/can/o1heap/o1heap"/>
 									<listOptionValue builtIn="false" value="/home/mgi/Data/github/can/libudpard/libudpard"/>
-									<listOptionValue builtIn="false" value="/home/mgi/Data/github/can/libserard_pk/libserard"/>
+									<listOptionValue builtIn="false" value="/home/mgi/Data/github/can/nunavut_out"/>
+									<listOptionValue builtIn="false" value="/home/mgi/Data/github/can/libserard_ck/libserard"/>
 								</option>
 								<inputType id="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.assembler.input.1229751562" superClass="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.assembler.input"/>
 							</tool>
@@ -66,7 +67,8 @@
 									<listOptionValue builtIn="false" value="/home/mgi/Data/github/can/libcanard/libcanard"/>
 									<listOptionValue builtIn="false" value="/home/mgi/Data/github/can/o1heap/o1heap"/>
 									<listOptionValue builtIn="false" value="/home/mgi/Data/github/can/libudpard/libudpard"/>
-									<listOptionValue builtIn="false" value="/home/mgi/Data/github/can/libserard_pk/libserard"/>
+									<listOptionValue builtIn="false" value="/home/mgi/Data/github/can/nunavut_out"/>
+									<listOptionValue builtIn="false" value="/home/mgi/Data/github/can/libserard_ck/libserard"/>
 								</option>
 								<option id="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.c.compiler.option.warnings.fatal.30747269" name="Abort compilation on first error (-Wfatal-errors)" superClass="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.c.compiler.option.warnings.fatal" useByScannerDiscovery="false" value="true" valueType="boolean"/>
 								<inputType id="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.c.compiler.input.c.1383464031" superClass="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.c.compiler.input.c"/>
@@ -94,18 +96,28 @@
 									<listOptionValue builtIn="false" value="/home/mgi/Data/github/can/libcanard/libcanard"/>
 									<listOptionValue builtIn="false" value="/home/mgi/Data/github/can/o1heap/o1heap"/>
 									<listOptionValue builtIn="false" value="/home/mgi/Data/github/can/libudpard/libudpard"/>
-									<listOptionValue builtIn="false" value="/home/mgi/Data/github/can/libserard_pk/libserard"/>
+									<listOptionValue builtIn="false" value="/home/mgi/Data/github/can/nunavut_out"/>
+									<listOptionValue builtIn="false" value="/home/mgi/Data/github/can/libserard_ck/libserard"/>
 								</option>
 								<option id="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.compiler.option.languagestandard.182344041" name="Language standard" superClass="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.compiler.option.languagestandard" useByScannerDiscovery="true" value="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.compiler.option.languagestandard.value.gnupp20" valueType="enumerated"/>
 								<option id="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.compiler.option.warnings.fatal.839463672" name="Abort compilation on first error (-Wfatal-errors)" superClass="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.compiler.option.warnings.fatal" useByScannerDiscovery="false" value="false" valueType="boolean"/>
 								<option id="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.compiler.option.warnings.extra.2143518767" name="Enable extra warning flags (-Wextra)" superClass="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.compiler.option.warnings.extra" useByScannerDiscovery="false" value="true" valueType="boolean"/>
-								<option id="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.compiler.option.warnings.treataserror.2111235800" superClass="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.compiler.option.warnings.treataserror" value="true" valueType="boolean"/>
-								<option id="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.compiler.option.warnings.pedantic.142188296" superClass="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.compiler.option.warnings.pedantic" value="true" valueType="boolean"/>
+								<option id="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.compiler.option.warnings.treataserror.2111235800" name="Treat warnings as errors (-Werror)" superClass="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.compiler.option.warnings.treataserror" useByScannerDiscovery="false" value="true" valueType="boolean"/>
+								<option id="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.compiler.option.warnings.pedantic.142188296" name="Issue all warnings demanded by strict ISO C and ISO C++ (-pedantic)" superClass="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.compiler.option.warnings.pedantic" useByScannerDiscovery="false" value="true" valueType="boolean"/>
 								<inputType id="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.compiler.input.cpp.1180505008" superClass="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.compiler.input.cpp"/>
 							</tool>
 							<tool id="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.c.linker.314007525" name="MCU/MPU GCC Linker" superClass="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.c.linker"/>
 							<tool id="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.linker.1032856403" name="MCU/MPU G++ Linker" superClass="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.linker">
 								<option id="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.linker.option.script.1388173919" name="Linker Script (-T)" superClass="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.linker.option.script" value="${workspace_loc:/${ProjName}/STM32L496ZGTX_FLASH.ld}" valueType="string"/>
+								<option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.linker.option.directories.817188581" superClass="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.linker.option.directories" valueType="libPaths">
+									<listOptionValue builtIn="false" value="/home/mgi/Data/github/can/lib_arm"/>
+								</option>
+								<option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.linker.option.libraries.1625231345" superClass="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.linker.option.libraries" valueType="libs">
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="canard"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="serard"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="udpard"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="o1heap"/>
+								</option>
 								<inputType id="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.linker.input.564017494" superClass="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.linker.input">
 									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
 									<additionalInput kind="additionalinput" paths="$(LIBS)"/>
@@ -166,7 +178,8 @@
 									<listOptionValue builtIn="false" value="/home/mgi/Data/github/can/libcanard/libcanard"/>
 									<listOptionValue builtIn="false" value="/home/mgi/Data/github/can/o1heap/o1heap"/>
 									<listOptionValue builtIn="false" value="/home/mgi/Data/github/can/libudpard/libudpard"/>
-									<listOptionValue builtIn="false" value="/home/mgi/Data/github/can/libserard_pk/libserard"/>
+									<listOptionValue builtIn="false" value="/home/mgi/Data/github/can/nunavut_out"/>
+									<listOptionValue builtIn="false" value="/home/mgi/Data/github/can/libserard_ck/libserard"/>
 								</option>
 								<inputType id="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.assembler.input.656994294" superClass="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.assembler.input"/>
 							</tool>
@@ -192,7 +205,8 @@
 									<listOptionValue builtIn="false" value="/home/mgi/Data/github/can/libcanard/libcanard"/>
 									<listOptionValue builtIn="false" value="/home/mgi/Data/github/can/o1heap/o1heap"/>
 									<listOptionValue builtIn="false" value="/home/mgi/Data/github/can/libudpard/libudpard"/>
-									<listOptionValue builtIn="false" value="/home/mgi/Data/github/can/libserard_pk/libserard"/>
+									<listOptionValue builtIn="false" value="/home/mgi/Data/github/can/nunavut_out"/>
+									<listOptionValue builtIn="false" value="/home/mgi/Data/github/can/libserard_ck/libserard"/>
 								</option>
 								<inputType id="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.c.compiler.input.c.82928754" superClass="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.c.compiler.input.c"/>
 							</tool>
@@ -218,13 +232,23 @@
 									<listOptionValue builtIn="false" value="/home/mgi/Data/github/can/libcanard/libcanard"/>
 									<listOptionValue builtIn="false" value="/home/mgi/Data/github/can/o1heap/o1heap"/>
 									<listOptionValue builtIn="false" value="/home/mgi/Data/github/can/libudpard/libudpard"/>
-									<listOptionValue builtIn="false" value="/home/mgi/Data/github/can/libserard_pk/libserard"/>
+									<listOptionValue builtIn="false" value="/home/mgi/Data/github/can/nunavut_out"/>
+									<listOptionValue builtIn="false" value="/home/mgi/Data/github/can/libserard_ck/libserard"/>
 								</option>
 								<inputType id="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.compiler.input.cpp.2070292508" superClass="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.compiler.input.cpp"/>
 							</tool>
 							<tool id="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.c.linker.1102418634" name="MCU/MPU GCC Linker" superClass="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.c.linker"/>
 							<tool id="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.linker.725385476" name="MCU/MPU G++ Linker" superClass="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.linker">
 								<option id="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.linker.option.script.703711745" name="Linker Script (-T)" superClass="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.linker.option.script" value="${workspace_loc:/${ProjName}/STM32L496ZGTX_FLASH.ld}" valueType="string"/>
+								<option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.linker.option.directories.520812596" superClass="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.linker.option.directories" valueType="libPaths">
+									<listOptionValue builtIn="false" value="/home/mgi/Data/github/can/lib_arm"/>
+								</option>
+								<option IS_BUILTIN_EMPTY="false" IS_VALUE_EMPTY="false" id="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.linker.option.libraries.5762343" superClass="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.linker.option.libraries" valueType="libs">
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="canard"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="serard"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="udpard"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="o1heap"/>
+								</option>
 								<inputType id="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.linker.input.2130930865" superClass="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.linker.input">
 									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
 									<additionalInput kind="additionalinput" paths="$(LIBS)"/>

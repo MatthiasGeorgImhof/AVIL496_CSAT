@@ -23,7 +23,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "cppmain.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -131,29 +131,22 @@ int main(void)
   MX_USB_DEVICE_Init();
   MX_RTC_Init();
   /* USER CODE BEGIN 2 */
+  struct HAL_Handles handles = {
+		  &hcan1, &hcan2,
+		  &hi2c1, &hi2c2, &hi2c4,
+		  &hrtc,
+		  &hspi1, &hspi2, &hspi3,
+		  &huart1, &huart2
+  };
 
+  SendWatchDogDone();
+  cppmain(handles);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  SendWatchDogDone();
   while (1)
   {
-
-//	  char* tx_buff1 = "USB USB USB USB USB  \r\n";
-//	  CDC_Transmit_FS((uint8_t*) tx_buff1, strlen(tx_buff1));
-//	  HAL_Delay(500);
-
-	  HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
-	  HAL_Delay(100);
-	  HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);
-	  HAL_Delay(200);
-	  HAL_GPIO_TogglePin(LED3_GPIO_Port, LED3_Pin);
-	  HAL_Delay(400);
-	  HAL_GPIO_TogglePin(LED4_GPIO_Port, LED4_Pin);
-	  HAL_Delay(800);
-	  HAL_GPIO_TogglePin(LED5_GPIO_Port, LED5_Pin);
-
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
