@@ -82,7 +82,11 @@ void SendWatchDogDone();
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
+extern int getentropy(void* buffer, size_t length) {
+    (void)buffer;
+    (void)length;
+    return -1; // ENOSYS: Function not implemented
+}
 /* USER CODE END 0 */
 
 /**
