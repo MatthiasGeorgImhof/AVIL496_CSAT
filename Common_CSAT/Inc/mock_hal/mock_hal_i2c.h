@@ -34,13 +34,16 @@ typedef struct {
 } I2C_HandleTypeDef;
 
 //--- I2C Mock Function Prototypes ---
+uint32_t HAL_I2C_Master_Receive(I2C_HandleTypeDef *hi2c, uint16_t DevAddress, uint8_t *pData, uint16_t Size, uint32_t Timeout);
 HAL_StatusTypeDef HAL_I2C_Master_Transmit(I2C_HandleTypeDef *hi2c, uint16_t DevAddress, uint8_t *pData, uint16_t Size, uint32_t Timeout);
 HAL_StatusTypeDef HAL_I2C_Mem_Read(I2C_HandleTypeDef *hi2c, uint16_t DevAddress, uint16_t MemAddress, uint16_t MemAddSize, uint8_t *pData, uint16_t Size, uint32_t Timeout);
 HAL_StatusTypeDef HAL_I2C_Mem_Write(I2C_HandleTypeDef *hi2c, uint16_t DevAddress, uint16_t MemAddress, uint16_t MemAddSize, uint8_t *pData, uint16_t Size, uint32_t Timeout);
 
 //--- I2C Helper Function Prototypes ---
 void inject_i2c_mem_data(uint16_t DevAddress, uint16_t MemAddress,uint8_t *data, uint16_t size);
+void inject_i2c_rx_data(uint16_t DevAddress, const uint8_t* data, uint16_t size);
 void clear_i2c_mem_data();
+void clear_i2c_rx_data();
 
 // I2C Getters
 uint16_t get_i2c_mem_buffer_dev_address();

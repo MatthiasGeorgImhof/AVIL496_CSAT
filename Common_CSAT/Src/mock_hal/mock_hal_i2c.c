@@ -9,6 +9,9 @@ uint16_t i2c_mem_buffer_dev_address;           // I2C device address
 uint16_t i2c_mem_buffer_mem_address;           // I2C memory address
 uint16_t i2c_mem_buffer_count = 0;              // Number of bytes in I2C memory buffer
 
+uint8_t i2c_rx_buffer[I2C_MEM_BUFFER_SIZE]; 
+uint16_t i2c_rx_buffer_count = 0;
+
 uint32_t HAL_I2C_Master_Transmit(I2C_HandleTypeDef *hi2c, uint16_t DevAddress, uint8_t *pData, uint16_t Size, uint32_t /*Timeout*/)
 {
     if (hi2c == NULL || pData == NULL) {
@@ -24,6 +27,14 @@ uint32_t HAL_I2C_Master_Transmit(I2C_HandleTypeDef *hi2c, uint16_t DevAddress, u
     i2c_mem_buffer_count = Size;
 
     memcpy(i2c_mem_buffer, pData, Size);
+    return 0;
+}
+
+uint32_t HAL_I2C_Master_Receive(I2C_HandleTypeDef *hi2c, uint16_t DevAddress, uint8_t *pData, uint16_t Size, uint32_t /*Timeout*/) {
+    if (hi2c == NULL || pData == NULL) return 1;
+    if (i2c_mem_buffer_dev_address != DevAddress || i2c_rx_buffer_count < Size) return 1;
+
+    memcpy(pData, i2c_rx_buffer, Size);
     return 0;
 }
 
@@ -68,10 +79,21 @@ void inject_i2c_mem_data(uint16_t DevAddress, uint16_t MemAddress,uint8_t *data,
     i2c_mem_buffer_count = size;
 }
 
+void inject_i2c_rx_data(uint16_t DevAddress, const uint8_t* data, uint16_t size) {
+    i2c_mem_buffer_dev_address = DevAddress;
+    memcpy(i2c_rx_buffer, data, size);
+    i2c_rx_buffer_count = size;
+}
+
 // I2C Deleters
 void clear_i2c_mem_data(){
     memset(i2c_mem_buffer, 0, sizeof(i2c_mem_buffer)); //Set all elements to 0
     i2c_mem_buffer_count = 0;
+}
+
+void clear_i2c_rx_data(){
+    memset(i2c_rx_buffer, 0, sizeof(i2c_rx_buffer)); //Set all elements to 0
+    i2c_rx_buffer_count = 0;
 }
 
 int get_i2c_buffer_count() {

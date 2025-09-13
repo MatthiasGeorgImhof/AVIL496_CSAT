@@ -1,64 +1,57 @@
 #ifndef _POWER_SWITCH_H_
 #define _POWER_SWITCH_H_
 
-#include "mock_hal.h"
-#include <array>
+#include "Drivers.hpp"
 #include <cstdint>
+#include <array>
 
+
+template <typename Transport>
+    requires RegisterModeTransport<Transport>
 class PowerSwitch
 {
 public:
     PowerSwitch() = delete;
-    PowerSwitch(I2C_HandleTypeDef *hi2c, uint8_t i2c_address) : hi2c_(hi2c), i2c_address_(i2c_address), register_value_(0)
+
+    explicit PowerSwitch(const Transport &transport)
+        : transport_(transport), register_value_(0)
     {
-    	uint8_t reset[] = {0,0,0,0,0,0,0,0,0,0,0};
-    	writeRegister(IODIR, reset, sizeof(reset));
+        uint8_t reset[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+        writeRegister(IODIR, reset, sizeof(reset));
     }
 
-    bool on(const uint8_t slot)
+    bool on(uint8_t slot)
     {
-        if (invalidslot(slot))
-        {
+        if (invalidSlot(slot))
             return false;
-        }
-
-        uint8_t mask = 1 << (2 * slot);
-        register_value_ |= mask;
+        register_value_ |= static_cast<uint8_t>(1 << (2 * slot));
         return writeRegister(GPIO, &register_value_, 1);
     }
 
-    bool off(const uint8_t slot)
+    bool off(uint8_t slot)
     {
-        if (invalidslot(slot))
-        {
+        if (invalidSlot(slot))
             return false;
-        }
-
-        uint8_t mask = static_cast<uint8_t>(~(1 << (2 * slot)));
-        register_value_ &= mask;
+        register_value_ &= static_cast<uint8_t>(~(1 << (2 * slot)));
         return writeRegister(GPIO, &register_value_, 1);
     }
 
-    bool status(const uint8_t slot)
+    bool status(uint8_t slot) const
     {
-        if (invalidslot(slot))
-        {
+        if (invalidSlot(slot))
             return false;
-        }
-
-        uint8_t mask = 1 << (2 * slot);
-        return (register_value_ & mask) != 0;
+        return (register_value_ & (1 << (2 * slot))) != 0;
     }
 
-    bool  setState(const uint8_t mask)
+    bool setState(uint8_t mask)
     {
-    	register_value_ = mask;
+        register_value_ = mask;
         return writeRegister(GPIO, &register_value_, 1);
     }
 
-    uint8_t getState()
+    uint8_t getState() const
     {
-    	return register_value_;
+        return register_value_;
     }
 
 private:
@@ -66,21 +59,32 @@ private:
     static constexpr uint8_t GPIO = 0x09;
     static constexpr uint8_t OLAT = 0x0A;
 
-private:
     bool writeRegister(uint8_t reg, uint8_t *data, uint16_t size)
     {
-        return (HAL_I2C_Mem_Write(hi2c_, i2c_address_<<1, reg, I2C_MEMADD_SIZE_8BIT, data, size, HAL_MAX_DELAY) == HAL_OK);
+        constexpr size_t MaxSize = 16;
+        static_assert(MaxSize >= 1, "MaxSize must accommodate register + data");
+
+        if (size > MaxSize - 1)
+        {
+            return false; // prevent overflow
+        }
+
+        std::array<uint8_t, MaxSize> tx{};
+        tx[0] = reg;
+        std::memcpy(&tx[1], data, size);
+
+        uint8_t dummy_rx[1]; // unused
+        return transport_.write_then_read(tx.data(), size + 1, dummy_rx, 0);
     }
 
-    inline bool invalidslot(const uint8_t slot)
+    static constexpr bool invalidSlot(uint8_t slot)
     {
-        return (slot >= 4);
+        return slot >= 4;
     }
 
 private:
-    I2C_HandleTypeDef *hi2c_;
-    uint8_t i2c_address_;
+    const Transport &transport_;
     uint8_t register_value_;
 };
 
-#endif /*_POWER_SWITCH_H */
+#endif /* _POWER_SWITCH_H_ */

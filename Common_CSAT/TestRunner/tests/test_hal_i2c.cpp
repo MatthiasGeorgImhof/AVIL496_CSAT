@@ -51,3 +51,40 @@ TEST_CASE("HAL_I2C_Mem_Write")
     uint8_t data[] = {0xDE, 0xAD, 0xBE, 0xEF};
     CHECK(HAL_I2C_Mem_Write(&hi2c, 0x50, 0x20, 1, data, 4, 100) == HAL_OK);
 }
+
+TEST_CASE("HAL_I2C_Master_Receive success")
+{
+    I2C_HandleTypeDef hi2c;
+    uint8_t expected_data[] = {0xAA, 0xBB};
+    uint8_t read_data[2] = {};
+
+    inject_i2c_rx_data(0x50, expected_data, sizeof(expected_data));
+    CHECK(HAL_I2C_Master_Receive(&hi2c, 0x50, read_data, sizeof(read_data), 100) == HAL_OK);
+    CHECK(memcmp(read_data, expected_data, sizeof(expected_data)) == 0);
+
+    clear_i2c_rx_data();
+}
+
+TEST_CASE("HAL_I2C_Master_Receive fails with wrong address")
+{
+    I2C_HandleTypeDef hi2c;
+    uint8_t expected_data[] = {0xAA, 0xBB};
+    uint8_t read_data[2] = {};
+
+    inject_i2c_rx_data(0x50, expected_data, sizeof(expected_data));
+    CHECK(HAL_I2C_Master_Receive(&hi2c, 0x51, read_data, sizeof(read_data), 100) == HAL_ERROR);
+
+    clear_i2c_rx_data();
+}
+
+TEST_CASE("HAL_I2C_Master_Receive fails with insufficient data")
+{
+    I2C_HandleTypeDef hi2c;
+    uint8_t expected_data[] = {0xAA};
+    uint8_t read_data[2] = {};
+
+    inject_i2c_rx_data(0x50, expected_data, sizeof(expected_data));
+    CHECK(HAL_I2C_Master_Receive(&hi2c, 0x50, read_data, sizeof(read_data), 100) == HAL_ERROR);
+
+    clear_i2c_rx_data();
+}

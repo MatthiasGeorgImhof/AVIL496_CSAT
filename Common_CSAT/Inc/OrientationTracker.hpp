@@ -118,12 +118,12 @@ public:
 
     void printDebugState(const std::string &label = "") const
     {
-    	constexpr float M_PIf = static_cast<float>(std::numbers::pi);
+    	constexpr float m_pif = static_cast<float>(std::numbers::pi);
     	const auto &x = ekf.stateVector;
         std::cout << "\n[Tracker State] " << label << "\n";
         std::cout << "Quaternion: [" << x(0) << ", " << x(1) << ", " << x(2) << ", " << x(3) << "]\n";
         std::cout << "Angular rate: [" << x(4) << ", " << x(5) << ", " << x(6) << "]\n";
-        std::cout << "Orientation: " << getYawPitchRoll().transpose() * 180.0f / M_PIf << " deg\n";
+        std::cout << "Orientation: " << getYawPitchRoll().transpose() * 180.0f / m_pif << " deg\n";
     }
 
 protected:

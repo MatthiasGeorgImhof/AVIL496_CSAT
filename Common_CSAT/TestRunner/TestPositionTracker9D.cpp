@@ -12,7 +12,7 @@
 #include "mock_hal.h"
 #include "TimeUtils.hpp"
 #include "GNSS.hpp"
-#include "IMU.hpp"
+#include "IMUExtension.hpp"
 
 TEST_CASE("rotateNEDtoECEF correctly transforms known NED vectors at various lat/lon")
 {
