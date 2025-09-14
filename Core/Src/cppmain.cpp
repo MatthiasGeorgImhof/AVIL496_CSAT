@@ -1,4 +1,5 @@
-#include "main.h"
+#include <cppmain.h>
+#include <cpphal.h>
 #include "usb_device.h"
 
 #include <memory>
@@ -39,21 +40,9 @@
 #include "TaskRequestGetInfo.hpp"
 #include "PowerSwitch.hpp"
 #include "PowerMonitor.hpp"
+#include "BMI270.hpp"
 
-#include <cppmain.h>
 #include "Logger.hpp"
-
-CAN_HandleTypeDef *hcan1_;
-CAN_HandleTypeDef *hcan2_;
-I2C_HandleTypeDef *hi2c1_;
-I2C_HandleTypeDef *hi2c2_;
-I2C_HandleTypeDef *hi2c4_;
-RTC_HandleTypeDef *hrtc_;
-SPI_HandleTypeDef *hspi1_;
-SPI_HandleTypeDef *hspi2_;
-SPI_HandleTypeDef *hspi3_;
-UART_HandleTypeDef *huart1_;
-UART_HandleTypeDef *huart2_;
 
 constexpr size_t O1HEAP_SIZE = 65536;
 uint8_t o1heap_buffer[O1HEAP_SIZE] __attribute__ ((aligned (O1HEAP_ALIGNMENT)));
@@ -88,6 +77,18 @@ constexpr CyphalNodeID cyphal_node_id = CYPHAL_NODE_ID;
 constexpr size_t CAN_RX_BUFFER_SIZE = 64;
 CircularBuffer<CanRxFrame, CAN_RX_BUFFER_SIZE> can_rx_buffer;
 
+enum class AUX_POWER_SWITCH : uint8_t
+{
+	ACS_LOGIC_3V3 = 0,
+	MRAM_3V3 = 1,
+	GYRO_3V3 = 2,
+	CLK_3V3 = 3,
+	TEMP_3V3 = 4,
+	MAG_3V3 = 5,
+	SUN_3V3 = 6,
+	GPS_3V3 = 7,
+};
+
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
 {
 	uint32_t num_messages = HAL_CAN_GetRxFifoFillLevel(hcan, CAN_RX_FIFO0);
@@ -104,18 +105,12 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
 uint16_t endian_swap(uint16_t num) {return (num>>8) | (num<<8); };
 int16_t endian_swap(int16_t num) {return (num>>8) | (num<<8); };
 
-void cppmain(HAL_Handles handles)
+void cppmain()
 {
-	hcan1_ = handles.hcan1;
-	hcan2_ = handles.hcan2;
-	hi2c1_ = handles.hi2c1;
-	hi2c2_ = handles.hi2c2;
-	hi2c4_ = handles.hi2c4;
-
-	if (HAL_CAN_Start(hcan1_) != HAL_OK) {
+	if (HAL_CAN_Start(&hcan1) != HAL_OK) {
 		Error_Handler();
 	}
-	if (HAL_CAN_ActivateNotification(hcan1_, CAN_IT_RX_FIFO0_MSG_PENDING) != HAL_OK)
+	if (HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING) != HAL_OK)
 	{
 		Error_Handler();
 	}
@@ -131,7 +126,7 @@ void cppmain(HAL_Handles handles)
 	filter.FilterScale = CAN_FILTERSCALE_16BIT;
 	filter.FilterActivation = ENABLE;
 	filter.SlaveStartFilterBank = 0;
-	HAL_CAN_ConfigFilter(hcan1_, &filter);
+	HAL_CAN_ConfigFilter(&hcan1, &filter);
 
 	o1heap = o1heapInit(o1heap_buffer, O1HEAP_SIZE);
 	O1HeapAllocator<CanardRxTransfer> alloc(o1heap);
@@ -192,22 +187,46 @@ void cppmain(HAL_Handles handles)
     ServiceManager service_manager(registration_manager.getHandlers());
 	service_manager.initializeServices(HAL_GetTick());
 
+	HAL_GPIO_WritePin(GPIOC, GPIO_POWER_RST_Pin, GPIO_PIN_SET);
+	HAL_Delay(1);
+
+	constexpr uint8_t GPIO_EXPANDER = 32;
+	using SwitchConfig = I2C_Config<hi2c2, GPIO_EXPANDER>;
+    using SwitchTransport = I2CTransport<SwitchConfig>;
+    SwitchTransport switch_transport;
+    PowerSwitch<SwitchTransport> power_switch(switch_transport);
+//	power_switch.on(static_cast<uint8_t>(AUX_POWER_SWITCH::GYRO_3V3));
+    for(uint8_t s=0; s<8; ++s) power_switch.on(s);
+
+	constexpr uint8_t INA226 = 64;
+	using MonitorConfig = I2C_Config<hi2c2, INA226>;
+    using MonitorTransport = I2CTransport<MonitorConfig>;
+    MonitorTransport monitor_transport;
+	PowerMonitor<MonitorTransport> power_monitor(monitor_transport);
+
+	using IMUConfig = SPI_Config<hspi2, &GPIOD_object, GPIO_SPI2_GYRO_CS_Pin>;
+    using IMUTransport = SPITransport<IMUConfig>;
+    IMUTransport imu_transport;
+    BMI270<IMUTransport> imu(imu_transport);
+
+
 	O1HeapAllocator<CyphalTransfer> allocator(o1heap);
 	LoopManager loop_manager(allocator);
 	while(1)
 	{
-		log(LOG_LEVEL_TRACE, "while loop: %d\r\n", HAL_GetTick());
-		log(LOG_LEVEL_TRACE, "RegistrationManager: (%d %d) (%d %d) \r\n",
-				registration_manager.getHandlers().capacity(), registration_manager.getHandlers().size(),
-				registration_manager.getSubscriptions().capacity(), registration_manager.getSubscriptions().size());
-		log(LOG_LEVEL_TRACE, "ServiceManager: (%d %d) \r\n",
-				service_manager.getHandlers().capacity(), service_manager.getHandlers().size());
-		log(LOG_LEVEL_TRACE, "CanProcessRxQueue: (%d %d) \r\n",
-				can_rx_buffer.capacity(), can_rx_buffer.size());
-		loop_manager.CanProcessTxQueue(&canard_adapter, hcan1_);
+		loop_manager.CanProcessTxQueue(&canard_adapter, &hcan1);
 		loop_manager.CanProcessRxQueue(&canard_cyphal, &service_manager, empty_adapters, can_rx_buffer);
 		loop_manager.LoopProcessRxQueue(&loopard_cyphal, &service_manager, empty_adapters);
 		service_manager.handleServices();
+
+	    auto imu_id = imu.readChipID();
+
+		PowerMonitorData data;
+		power_monitor(data);
+		char buffer[256];
+		sprintf(buffer, "IMU ID: %u\r\nINA226: %4x %4x % 6d % 6d % 6d % 6d\r\n", imu_id.value(),
+			  data.manufacturer_id, data.die_id, data.voltage_shunt_uV, data.voltage_bus_mV, data.power_mW, data.current_uA);
+		CDC_Transmit_FS((uint8_t*) buffer, strlen(buffer));
 
 		HAL_Delay(100);
 	}

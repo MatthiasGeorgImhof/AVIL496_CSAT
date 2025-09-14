@@ -131,16 +131,8 @@ int main(void)
   MX_USB_DEVICE_Init();
   MX_RTC_Init();
   /* USER CODE BEGIN 2 */
-  struct HAL_Handles handles = {
-		  &hcan1, &hcan2,
-		  &hi2c1, &hi2c2, &hi2c4,
-		  &hrtc,
-		  &hspi1, &hspi2, &hspi3,
-		  &huart1, &huart2
-  };
-
   SendWatchDogDone();
-  cppmain(handles);
+  cppmain();
   /* USER CODE END 2 */
 
   /* Infinite loop */
