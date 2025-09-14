@@ -5,6 +5,8 @@
 #include <limits>
 #include <cmath>
 
+#include "Drivers.hpp"
+
 #include "mock_hal.h"
 
 enum class INA226_REGISTERS : uint8_t
@@ -31,14 +33,15 @@ struct PowerMonitorData
 	uint16_t die_id;
 };
 
+template <RegisterModeTransport Transport>
 class PowerMonitor
 {
 public:
 	PowerMonitor() = delete;
-	PowerMonitor(I2C_HandleTypeDef *hi2c, uint8_t i2c_address) : hi2c_(hi2c), i2c_address_(i2c_address)
+	explicit PowerMonitor(const Transport &transport) : transport_(transport)
 	{
 		reset();
-	};
+	}
 
 	bool reset()
 	{
@@ -59,11 +62,11 @@ public:
 	bool getShuntVoltage(uint16_t &value) const
 	{
 		int16_t value_;
-		bool result = getRegister(INA226_REGISTERS::INA226_SHUNT_VOLTAGE, reinterpret_cast<uint16_t*>(&value_));
+		bool result = getRegister(INA226_REGISTERS::INA226_SHUNT_VOLTAGE, reinterpret_cast<uint16_t *>(&value_));
 		value = checkAndCast(5U * static_cast<uint16_t>(abs(value_)) / 2U);
 		return result;
 	}
-	
+
 	bool getBusVoltage(uint16_t &value) const
 	{
 		uint16_t value_;
@@ -71,7 +74,7 @@ public:
 		value = checkAndCast(5 * static_cast<uint32_t>(value_) / 4);
 		return result;
 	}
-	
+
 	bool getPower(uint16_t &value) const
 	{
 		uint16_t value_;
@@ -79,7 +82,7 @@ public:
 		value = checkAndCast(static_cast<uint32_t>(value_) * lsb_power_W_);
 		return result;
 	}
-	
+
 	bool getCurrent(uint16_t &value) const
 	{
 		uint16_t value_;
@@ -87,24 +90,24 @@ public:
 		value = checkAndCast(static_cast<uint32_t>(value_) * lsb_current_uA_);
 		return result;
 	}
-	
+
 	bool getManufacturerId(uint16_t &value) const
 	{
 		return getRegister(INA226_REGISTERS::INA226_MANUFACTURER, &value);
 	}
-	
+
 	bool getDieId(uint16_t &value) const
 	{
 		return getRegister(INA226_REGISTERS::INA226_DIE_ID, &value);
 	}
-	
+
 	bool operator()(PowerMonitorData &data) const
 	{
 		bool result = true;
 		result &= getShuntVoltage(data.voltage_shunt_uV);
 		result &= getBusVoltage(data.voltage_bus_mV);
 		result &= getPower(data.power_mW);
-		result &= getCurrent(data.current_uA);	
+		result &= getCurrent(data.current_uA);
 		result &= getManufacturerId(data.manufacturer_id);
 		result &= getDieId(data.die_id);
 		return result;
@@ -125,23 +128,27 @@ private:
 
 	bool setRegister(INA226_REGISTERS reg, uint16_t value) const
 	{
-		uint16_t value_ = byteswap(value);
-		return (HAL_I2C_Mem_Write(hi2c_, i2c_address_<<1, static_cast<uint8_t>(reg), I2C_MEMADD_SIZE_8BIT, reinterpret_cast<uint8_t*>(&value_), sizeof(value_), HAL_MAX_DELAY) == HAL_OK);
+		uint8_t tx_buf[3] = {
+			static_cast<uint8_t>(reg),
+			static_cast<uint8_t>((value >> 8) & 0xFF),
+			static_cast<uint8_t>(value & 0xFF)};
+		uint8_t rx_dummy[1] = {};
+		return transport_.write_then_read(tx_buf, sizeof(tx_buf), rx_dummy, 0);
 	}
 
 	bool getRegister(INA226_REGISTERS reg, uint16_t *value) const
 	{
-		uint16_t value_;
-		bool result = (HAL_I2C_Mem_Read(hi2c_, i2c_address_<<1, static_cast<uint8_t>(reg), I2C_MEMADD_SIZE_8BIT, reinterpret_cast<uint8_t*>(&value_), sizeof(value_), HAL_MAX_DELAY) == HAL_OK);
-		*value = byteswap(value_);
-		return result;
+		uint8_t tx_buf[1] = {static_cast<uint8_t>(reg)};
+		uint8_t rx_buf[2] = {};
+		bool ok = transport_.write_then_read(tx_buf, sizeof(tx_buf), rx_buf, sizeof(rx_buf));
+		*value = (rx_buf[0] << 8) | rx_buf[1];
+		return ok;
 	}
 
 	void delay() { HAL_Delay(1); };
 
 private:
-	I2C_HandleTypeDef *hi2c_;
-	uint8_t i2c_address_;
+    const Transport& transport_;
 
 	// equation 1: calibration = 0.00512 * (Vshunt * LSBcurrent) in A and ohm
 

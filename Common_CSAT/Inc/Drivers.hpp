@@ -30,7 +30,7 @@ struct I2C_Config {
     using mode_tag = register_mode_tag;
 
     static I2C_HandleTypeDef& handle() { return HandleRef; }
-    static constexpr uint16_t address = Address;
+    static constexpr uint16_t address = Address << 1;
     static constexpr uint32_t timeout = Timeout;
 
     static_assert(std::is_same_v<decltype(HandleRef), I2C_HandleTypeDef&>, "Handle must be I2C_HandleTypeDef&");
