@@ -9,6 +9,7 @@
 
 #include "mock_hal.h"
 
+// INA226 I2C Address Options
 enum class INA226_REGISTERS : uint8_t
 {
 	INA226_CONFIGURATION = 0x00,

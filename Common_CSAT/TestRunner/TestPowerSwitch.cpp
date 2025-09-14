@@ -24,7 +24,6 @@ TEST_CASE("PowerSwitch On/Off/Status") {
 
     SUBCASE("Turn on slot 0") {
         pm.on(0);
-
         CHECK(get_i2c_buffer_count() == 2);
         CHECK(get_i2c_buffer()[0] == ps_register);
         CHECK(get_i2c_buffer()[1] == 0b00000001); // Bit 0 should be set
@@ -44,10 +43,9 @@ TEST_CASE("PowerSwitch On/Off/Status") {
 
     SUBCASE("Turn on slot 1") {
         pm.on(1);
-
         CHECK(get_i2c_buffer_count() == 2);
         CHECK(get_i2c_buffer()[0] == ps_register);
-        CHECK(get_i2c_buffer()[1] == 0b00000100); // Bit 2 should be set
+        CHECK(get_i2c_buffer()[1] == 0b00000010); // Bit 1 should be set
         CHECK(pm.status(1) == true);
     }
 
@@ -55,7 +53,7 @@ TEST_CASE("PowerSwitch On/Off/Status") {
         pm.on(2);
         CHECK(get_i2c_buffer_count() == 2);
         CHECK(get_i2c_buffer()[0] == ps_register);
-        CHECK(get_i2c_buffer()[1] == 0b00010000); // Bit 4 should be set
+        CHECK(get_i2c_buffer()[1] == 0b00000100); // Bit 2 should be set
         CHECK(pm.status(2) == true);
     }
 
@@ -63,23 +61,54 @@ TEST_CASE("PowerSwitch On/Off/Status") {
         pm.on(3);
         CHECK(get_i2c_buffer_count() == 2);
         CHECK(get_i2c_buffer()[0] == ps_register);
-        CHECK(get_i2c_buffer()[1] == 0b01000000); // Bit 6 should be set
+        CHECK(get_i2c_buffer()[1] == 0b00001000); // Bit 3 should be set
         CHECK(pm.status(3) == true);
     }
 
+    SUBCASE("Turn off slot 4") {
+        pm.on(4);
+        CHECK(get_i2c_buffer_count() == 2);
+        CHECK(get_i2c_buffer()[0] == ps_register);
+        CHECK(get_i2c_buffer()[1] == 0b00010000); // Bit 4 should be cleared
+        CHECK(pm.status(4) == true);
+    }
+
+    SUBCASE("Turn on slot 5") {
+        pm.on(5);
+        CHECK(get_i2c_buffer_count() == 2);
+        CHECK(get_i2c_buffer()[0] == ps_register);
+        CHECK(get_i2c_buffer()[1] == 0b00100000); // Bit 5 should be set
+        CHECK(pm.status(5) == true);
+    }
+
+    SUBCASE("Turn on slot 6") {
+        pm.on(6);
+        CHECK(get_i2c_buffer_count() == 2);
+        CHECK(get_i2c_buffer()[0] == ps_register);
+        CHECK(get_i2c_buffer()[1] == 0b01000000); // Bit 6 should be set
+        CHECK(pm.status(6) == true);
+    }
+
+    SUBCASE("Turn on slot 7") {
+        pm.on(7);
+        CHECK(get_i2c_buffer_count() == 2);
+        CHECK(get_i2c_buffer()[0] == ps_register);
+        CHECK(get_i2c_buffer()[1] == 0b10000000); // Bit 7 should be set
+        CHECK(pm.status(7) == true);
+    }
     SUBCASE("Turn on and off multiple slots") {
         pm.on(0);
         pm.on(2);
         CHECK(get_i2c_buffer_count() == 2);
         CHECK(get_i2c_buffer()[0] == ps_register);
-        CHECK(get_i2c_buffer()[1] == 0b00010001);
+        CHECK(get_i2c_buffer()[1] == 0b00000101);
         CHECK(pm.status(0) == true);
         CHECK(pm.status(2) == true);
 
         pm.off(0);
         CHECK(get_i2c_buffer()[0] == ps_register);
         CHECK(get_i2c_buffer_count() == 2);
-        CHECK(get_i2c_buffer()[1] == 0b00010000);
+        CHECK(get_i2c_buffer()[1] == 0b00000100);
         CHECK(pm.status(0) == false);
         CHECK(pm.status(2) == true);
 
@@ -93,9 +122,9 @@ TEST_CASE("PowerSwitch On/Off/Status") {
 
     SUBCASE("Invalid slot check") {
         CHECK(get_i2c_buffer_count() == 0); // I2C transactions cancelled
-        pm.on(4);  // Invalid slot
+        pm.on(8);  // Invalid slot
         CHECK(get_i2c_buffer()[0] == 0b00000000); //register_value_ should still be 0
-        CHECK(pm.status(4) == false);
+        CHECK(pm.status(8) == false);
     }
 
     SUBCASE("Initial status is off") {
