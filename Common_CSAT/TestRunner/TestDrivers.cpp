@@ -12,6 +12,20 @@ I2C_HandleTypeDef mock_i2c;
 using TestI2CConfig = I2C_Config<mock_i2c, 0x42>;
 using TestI2CTransport = I2CTransport<TestI2CConfig>;
 
+TEST_CASE("I2CTransport write() sends correct register and payload")
+{
+    clear_i2c_mem_data();
+
+    TestI2CTransport transport;
+    uint8_t tx[] = {0x05, 0xAA, 0xBB}; // e.g. register + 2-byte payload
+    CHECK(transport.write(tx, sizeof(tx)) == true);
+
+    CHECK(get_i2c_buffer_count() == sizeof(tx));
+    CHECK(get_i2c_buffer()[0] == 0x05); // register
+    CHECK(get_i2c_buffer()[1] == 0xAA);
+    CHECK(get_i2c_buffer()[2] == 0xBB);
+}
+
 TEST_CASE("I2CTransport write_then_read() performs atomic transaction")
 {
     clear_i2c_rx_data(); // optional, for test hygiene
@@ -36,6 +50,19 @@ SPI_HandleTypeDef mock_spi;
 GPIO_TypeDef GPIOA;
 using TestSPIConfig = SPI_Config<mock_spi, &GPIOA, GPIO_PIN_5>;
 using TestSPITransport = SPITransport<TestSPIConfig>;
+
+TEST_CASE("SPITransport write() transmits payload with CS toggled")
+{
+    clear_spi_tx_buffer();
+
+    TestSPITransport transport;
+    uint8_t tx[] = {0x7E, 0x01}; // e.g. command + argument
+    CHECK(transport.write(tx, sizeof(tx)) == true);
+
+    CHECK(get_spi_tx_buffer_count() == sizeof(tx));
+    CHECK(get_spi_tx_buffer()[0] == 0x7E);
+    CHECK(get_spi_tx_buffer()[1] == 0x01);
+}
 
 TEST_CASE("SPITransport write_then_read() performs atomic transaction with CS held low")
 {

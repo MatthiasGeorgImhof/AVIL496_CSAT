@@ -132,8 +132,7 @@ private:
 			static_cast<uint8_t>(reg),
 			static_cast<uint8_t>((value >> 8) & 0xFF),
 			static_cast<uint8_t>(value & 0xFF)};
-		uint8_t rx_dummy[1] = {};
-		return transport_.write_then_read(tx_buf, sizeof(tx_buf), rx_dummy, 0);
+		return transport_.write(tx_buf, sizeof(tx_buf));
 	}
 
 	bool getRegister(INA226_REGISTERS reg, uint16_t *value) const

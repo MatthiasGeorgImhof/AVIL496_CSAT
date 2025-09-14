@@ -73,8 +73,7 @@ private:
         tx[0] = reg;
         std::memcpy(&tx[1], data, size);
 
-        uint8_t dummy_rx[1]; // unused
-        return transport_.write_then_read(tx.data(), size + 1, dummy_rx, 0);
+        return transport_.write(tx.data(), size + 1);
     }
 
     static constexpr bool invalidSlot(uint8_t slot)
