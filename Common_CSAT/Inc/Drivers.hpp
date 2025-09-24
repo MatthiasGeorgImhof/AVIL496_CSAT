@@ -11,6 +11,8 @@
 #include <cstddef>
 #include <type_traits>
 
+#include "usb_device.h"
+
 // Mode tags
 struct register_mode_tag
 {
@@ -56,12 +58,12 @@ class I2CTransport
 public:
     using config_type = Config;
 
-    bool write(uint8_t *tx_buf, uint16_t tx_len) const
+    bool write(const uint8_t *tx_buf, uint16_t tx_len) const
     {
-        return HAL_I2C_Master_Transmit(&Config::handle(), Config::address, tx_buf, tx_len, Config::timeout) == HAL_OK;
+        return HAL_I2C_Master_Transmit(&Config::handle(), Config::address, const_cast<uint8_t*>(tx_buf), tx_len, Config::timeout) == HAL_OK;
     }
 
-    bool write_then_read(uint8_t *tx_buf, uint16_t tx_len, uint8_t *rx_buf, uint16_t rx_len) const
+    bool write_then_read(const uint8_t *tx_buf, uint16_t tx_len, uint8_t *rx_buf, uint16_t rx_len) const
     {
         return HAL_I2C_Master_Transmit(&Config::handle(), Config::address, tx_buf, tx_len, Config::timeout) == HAL_OK &&
                HAL_I2C_Master_Receive(&Config::handle(), Config::address, rx_buf, rx_len, Config::timeout) == HAL_OK;
@@ -72,20 +74,26 @@ public:
 // SPI Transport (Register Mode)
 // ─────────────────────────────────────────────
 
-template <SPI_HandleTypeDef &HandleRef, GPIO_TypeDef *PortRef, uint16_t Pin, uint32_t Timeout = 100>
+template <SPI_HandleTypeDef &HandleRef, uint16_t Pin,
+          std::size_t MaxTransferSize, uint32_t Timeout = 100>
 struct SPI_Config
 {
-    using transport_tag = spi_tag;
+    SPI_Config() = delete;
+    SPI_Config(GPIO_TypeDef* csport) : csPort(csport) {}
+	using transport_tag = spi_tag;
     using mode_tag = register_mode_tag;
 
     static SPI_HandleTypeDef &handle() { return HandleRef; }
-    static GPIO_TypeDef *csPort() { return PortRef; }
     static constexpr uint16_t csPin = Pin;
     static constexpr uint32_t timeout = Timeout;
+    static constexpr std::size_t max_transfer_size = MaxTransferSize;
+
+public:
+    GPIO_TypeDef* csPort;
 
     static_assert(std::is_same_v<decltype(HandleRef), SPI_HandleTypeDef &>, "Handle must be SPI_HandleTypeDef&");
-    static_assert(std::is_pointer_v<decltype(PortRef)>, "Port must be a GPIO_TypeDef*");
     static_assert(Timeout > 0 && Timeout < 10000, "Timeout must be a reasonable value");
+    static_assert(MaxTransferSize > 0 && MaxTransferSize <= 1024, "MaxTransferSize must be reasonable");
 };
 
 template <typename Config>
@@ -95,7 +103,9 @@ class SPITransport
 public:
     using config_type = Config;
 
-    bool write(uint8_t *tx_buf, uint16_t tx_len) const
+    explicit SPITransport(const Config& cfg) : config(cfg) { deselect(); }
+
+    bool write(const uint8_t *tx_buf, uint16_t tx_len) const
     {
         select();
         bool ok = HAL_SPI_Transmit(&Config::handle(), tx_buf, tx_len, Config::timeout) == HAL_OK;
@@ -103,21 +113,23 @@ public:
         return ok;
     }
 
-    bool write_then_read(uint8_t *tx_buf, uint16_t tx_len, uint8_t *rx_buf, uint16_t rx_len) const
+    bool write_then_read(const uint8_t *tx_buf, uint16_t tx_len, uint8_t *rx_buf, uint16_t rx_len) const
     {
         select();
         bool ok = HAL_SPI_Transmit(&Config::handle(), tx_buf, tx_len, Config::timeout) == HAL_OK;
         if (ok)
         {
-            ok = HAL_SPI_Receive(&Config::handle(), rx_buf, rx_len, Config::timeout) == HAL_OK;
+            ok = HAL_SPI_TransmitReceive(&Config::handle(), rx_buf, rx_buf, rx_len, Config::timeout) == HAL_OK;
         }
         deselect();
         return ok;
     }
 
 private:
-    void select() const { HAL_GPIO_WritePin(Config::csPort(), Config::csPin, GPIO_PIN_RESET); }
-    void deselect() const { HAL_GPIO_WritePin(Config::csPort(), Config::csPin, GPIO_PIN_SET); }
+    Config config;
+
+    void select() const { HAL_GPIO_WritePin(config.csPort, Config::csPin, GPIO_PIN_RESET); }
+    void deselect() const { HAL_GPIO_WritePin(config.csPort, Config::csPin, GPIO_PIN_SET); }
 };
 
 // ─────────────────────────────────────────────
@@ -144,7 +156,7 @@ class UARTTransport
 public:
     using config_type = Config;
 
-    bool send(uint8_t *buf, uint16_t len) const
+    bool send(const uint8_t *buf, uint16_t len) const
     {
         return HAL_UART_Transmit(&Config::handle(), buf, len, Config::timeout) == HAL_OK;
     }

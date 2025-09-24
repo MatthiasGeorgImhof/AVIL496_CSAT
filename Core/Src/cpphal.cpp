@@ -15,3 +15,4 @@ GPIO_TypeDef& GPIOE_object = *GPIOE;
 GPIO_TypeDef& GPIOF_object = *GPIOF;
 GPIO_TypeDef& GPIOG_object = *GPIOG;
 
+// end cpphal.cpp

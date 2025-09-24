@@ -41,6 +41,11 @@
 #include "PowerSwitch.hpp"
 #include "PowerMonitor.hpp"
 #include "BMI270.hpp"
+#include "MMC5983.hpp"
+#include "MR25H10.hpp"
+
+#include "au.hh"
+#include "au.hpp"
 
 #include "Logger.hpp"
 
@@ -107,6 +112,14 @@ int16_t endian_swap(int16_t num) {return (num>>8) | (num<<8); };
 
 void cppmain()
 {
+	HAL_GPIO_WritePin(GPIOC, GPIO_POWER_RST_Pin, GPIO_PIN_SET);
+	constexpr uint8_t GPIO_EXPANDER = 32;
+	using SwitchConfig = I2C_Config<hi2c2, GPIO_EXPANDER>;
+    using SwitchTransport = I2CTransport<SwitchConfig>;
+    SwitchTransport switch_transport;
+    PowerSwitch<SwitchTransport> power_switch(switch_transport);
+    power_switch.setState(0x00);
+
 	if (HAL_CAN_Start(&hcan1) != HAL_OK) {
 		Error_Handler();
 	}
@@ -187,16 +200,7 @@ void cppmain()
     ServiceManager service_manager(registration_manager.getHandlers());
 	service_manager.initializeServices(HAL_GetTick());
 
-	HAL_GPIO_WritePin(GPIOC, GPIO_POWER_RST_Pin, GPIO_PIN_SET);
-	HAL_Delay(1);
-
-	constexpr uint8_t GPIO_EXPANDER = 32;
-	using SwitchConfig = I2C_Config<hi2c2, GPIO_EXPANDER>;
-    using SwitchTransport = I2CTransport<SwitchConfig>;
-    SwitchTransport switch_transport;
-    PowerSwitch<SwitchTransport> power_switch(switch_transport);
-//	power_switch.on(static_cast<uint8_t>(AUX_POWER_SWITCH::GYRO_3V3));
-    for(uint8_t s=0; s<8; ++s) power_switch.on(s);
+    power_switch.setState(0xff);
 
 	constexpr uint8_t INA226 = 64;
 	using MonitorConfig = I2C_Config<hi2c2, INA226>;
@@ -204,30 +208,78 @@ void cppmain()
     MonitorTransport monitor_transport;
 	PowerMonitor<MonitorTransport> power_monitor(monitor_transport);
 
-	using IMUConfig = SPI_Config<hspi2, &GPIOD_object, GPIO_SPI2_GYRO_CS_Pin>;
-    using IMUTransport = SPITransport<IMUConfig>;
-    IMUTransport imu_transport;
-    BMI270<IMUTransport> imu(imu_transport);
+	using IMUConfigType = SPI_Config<hspi2, GPIO_SPI2_GYRO_CS_Pin, 128>;
+	IMUConfigType imu_config(GPIOD);
+	SPITransport<IMUConfigType> imu_transport(imu_config);
+	BMI270<SPITransport<IMUConfigType>> imu(imu_transport);
+	(void) imu.readChipID();
+	(void) imu.readChipID();
+	HAL_Delay(5000);
+	assert(imu.initialize());
+	assert(imu.configure());
 
 
-	O1HeapAllocator<CyphalTransfer> allocator(o1heap);
+
+//	using MagConfig = SPI_Config<hspi1, &GPIOE_object, GPIO_SPI1_MAG_CS_Pin, 128>;
+//    using MagTransport = SPITransport<MagConfig>;
+//    MagTransport mag_transport;
+//    MMC5983<MagTransport> mag(mag_transport);
+//    (void) mag.readChipID();
+//
+//	using MramConfig = SPI_Config<hspi3, &GPIOG_object, GPIO_SPI3_MRAM_CS_Pin, 128>;
+//    using MramTransport = SPITransport<MramConfig>;
+//    MramTransport mram_transport;
+//    MR25H10<MramTransport> mram(mram_transport);
+//    (void) mag.readChipID();
+
+    O1HeapAllocator<CyphalTransfer> allocator(o1heap);
 	LoopManager loop_manager(allocator);
 	while(1)
 	{
+		char buffer[256];
 		loop_manager.CanProcessTxQueue(&canard_adapter, &hcan1);
 		loop_manager.CanProcessRxQueue(&canard_cyphal, &service_manager, empty_adapters, can_rx_buffer);
 		loop_manager.LoopProcessRxQueue(&loopard_cyphal, &service_manager, empty_adapters);
 		service_manager.handleServices();
 
-	    auto imu_id = imu.readChipID();
+//		sprintf(buffer, "SPI: %d %d %d \r\n", HAL_SPI_GetState(&hspi1), HAL_SPI_GetState(&hspi2), HAL_SPI_GetState(&hspi3));
 
-		PowerMonitorData data;
-		power_monitor(data);
-		char buffer[256];
-		sprintf(buffer, "IMU ID: %u\r\nINA226: %4x %4x % 6d % 6d % 6d % 6d\r\n", imu_id.value(),
-			  data.manufacturer_id, data.die_id, data.voltage_shunt_uV, data.voltage_bus_mV, data.power_mW, data.current_uA);
+//		static constexpr uint8_t BMI270_READ_BIT = 0x80;
+//		HAL_GPIO_WritePin(GPIO_SPI2_GYRO_CS_GPIO_Port, GPIO_SPI2_GYRO_CS_Pin, GPIO_PIN_RESET);
+//		uint8_t tx[1] { 0x00 | BMI270_READ_BIT };
+//		uint8_t rx[2] {};
+//		bool okt = HAL_SPI_Transmit(&hspi2, tx, sizeof(tx), 100) == HAL_OK;
+//		bool okr = HAL_SPI_TransmitReceive(&hspi2, rx, rx, sizeof(rx), 100) == HAL_OK;
+//		HAL_GPIO_WritePin(GPIO_SPI2_GYRO_CS_GPIO_Port, GPIO_SPI2_GYRO_CS_Pin, GPIO_PIN_SET);
+//		sprintf(buffer, "SPI direct: %d %x\r\n", HAL_SPI_GetState(&hspi2), rx[1]);
+//		CDC_Transmit_FS((uint8_t*) buffer, strlen(buffer));
+//		(void) okr;
+//		(void) okt;
+
+		HAL_Delay(125);
+		auto imu_acc = imu.readAccelerometer();
+		auto imu_gyr = imu.readGyroscope();
+		auto imu_tmp = imu.readThermometer();
+		sprintf(buffer, "SPI IMU: (%f %f %f) (%f %f %f) (%f)\r\n",
+				imu_acc.value()[0].in(au::metersPerSecondSquaredInBodyFrame),
+				imu_acc.value()[1].in(au::metersPerSecondSquaredInBodyFrame),
+				imu_acc.value()[2].in(au::metersPerSecondSquaredInBodyFrame),
+				imu_gyr.value()[0].in(au::degreesPerSecondInBodyFrame),
+				imu_gyr.value()[1].in(au::degreesPerSecondInBodyFrame),
+				imu_gyr.value()[2].in(au::degreesPerSecondInBodyFrame),
+				imu_tmp.value().in(au::celsius_qty));
+
+//	    auto imu_id = imu.readChipID();
+//	    auto mag_id = mag.readChipID();
+//	    auto mram_id = mram.readStatus();
+//	    auto power = power_switch.getState();
+//
+//		PowerMonitorData data;
+//		power_monitor(data);
+//		sprintf(buffer, "IMU ID: %u %u %u %u\r\nINA226: %4x %4x % 6d % 6d % 6d % 6d\r\n", power, imu_id.value(), mag_id.value(), mram_id.value(),
+//			  data.manufacturer_id, data.die_id, data.voltage_shunt_uV, data.voltage_bus_mV, data.power_mW, data.current_uA);
+
 		CDC_Transmit_FS((uint8_t*) buffer, strlen(buffer));
-
-		HAL_Delay(100);
+		HAL_Delay(125);
 	}
 }

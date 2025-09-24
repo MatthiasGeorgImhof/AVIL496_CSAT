@@ -40,7 +40,7 @@ public:
         if (invalidSlot(slot))
             return false;
         register_value_ |= static_cast<uint8_t>(1 << slot);
-        return writeRegister(MCP23008_REGISTERS::MCP23008_GPIO, &register_value_, 1);
+        return writeRegister(MCP23008_REGISTERS::MCP23008_OLAT, &register_value_, 1);
     }
 
     bool off(uint8_t slot)
@@ -48,7 +48,7 @@ public:
         if (invalidSlot(slot))
             return false;
         register_value_ &= static_cast<uint8_t>(~(1 << slot));
-        return writeRegister(MCP23008_REGISTERS::MCP23008_GPIO, &register_value_, 1);
+        return writeRegister(MCP23008_REGISTERS::MCP23008_OLAT, &register_value_, 1);
     }
 
     bool status(uint8_t slot) const
@@ -61,11 +61,12 @@ public:
     bool setState(uint8_t mask)
     {
         register_value_ = mask;
-        return writeRegister(MCP23008_REGISTERS::MCP23008_GPIO, &register_value_, 1);
+        return writeRegister(MCP23008_REGISTERS::MCP23008_OLAT, &register_value_, 1);
     }
 
-    uint8_t getState() const
+    uint8_t getState()
     {
+        register_value_ = readRegister(MCP23008_REGISTERS::MCP23008_OLAT);
         return register_value_;
     }
 
@@ -85,6 +86,14 @@ private:
         std::memcpy(&tx[1], data, size);
 
         return transport_.write(tx.data(), size + 1);
+    }
+
+    uint8_t readRegister(MCP23008_REGISTERS reg) const
+    {
+    	uint8_t tx = static_cast<uint8_t>(reg);
+    	uint8_t rx;
+    	transport_.write_then_read(&tx, 1, &rx, 1);
+    	return rx;
     }
 
     static constexpr bool invalidSlot(uint8_t slot)
