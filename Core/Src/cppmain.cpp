@@ -43,6 +43,7 @@
 #include "BMI270.hpp"
 #include "MMC5983.hpp"
 #include "MR25H10.hpp"
+#include "MMC5983.hpp"
 
 #include "au.hh"
 #include "au.hpp"
@@ -211,7 +212,7 @@ void cppmain()
 	using IMUConfigType = SPI_Config<hspi2, GPIO_SPI2_GYRO_CS_Pin, 128>;
 	IMUConfigType imu_config(GPIOD);
 	SPITransport<IMUConfigType> imu_transport(imu_config);
-	BMI270<SPITransport<IMUConfigType>> imu(imu_transport);
+	BMI270_MMC5983<SPITransport<IMUConfigType>> imu(imu_transport);
 	(void) imu.readChipID();
 	(void) imu.readChipID();
 	HAL_Delay(5000);
@@ -219,13 +220,13 @@ void cppmain()
 	assert(imu.configure());
 
 
+	using MagConfigType = SPI_Config<hspi1, GPIO_SPI1_MAG_CS_Pin, 128>;
+	MagConfigType mag_config(GPIOE);
+	SPITransport<MagConfigType> mag_transport(mag_config);
+    MMC5983<SPITransport<MagConfigType>> mag(mag_transport);
+    (void) mag.readChipID();
+	assert(mag.initialize());
 
-//	using MagConfig = SPI_Config<hspi1, &GPIOE_object, GPIO_SPI1_MAG_CS_Pin, 128>;
-//    using MagTransport = SPITransport<MagConfig>;
-//    MagTransport mag_transport;
-//    MMC5983<MagTransport> mag(mag_transport);
-//    (void) mag.readChipID();
-//
 //	using MramConfig = SPI_Config<hspi3, &GPIOG_object, GPIO_SPI3_MRAM_CS_Pin, 128>;
 //    using MramTransport = SPITransport<MramConfig>;
 //    MramTransport mram_transport;
@@ -257,17 +258,26 @@ void cppmain()
 //		(void) okt;
 
 		HAL_Delay(125);
-		auto imu_acc = imu.readAccelerometer();
-		auto imu_gyr = imu.readGyroscope();
-		auto imu_tmp = imu.readThermometer();
-		sprintf(buffer, "SPI IMU: (%f %f %f) (%f %f %f) (%f)\r\n",
-				imu_acc.value()[0].in(au::metersPerSecondSquaredInBodyFrame),
-				imu_acc.value()[1].in(au::metersPerSecondSquaredInBodyFrame),
-				imu_acc.value()[2].in(au::metersPerSecondSquaredInBodyFrame),
-				imu_gyr.value()[0].in(au::degreesPerSecondInBodyFrame),
-				imu_gyr.value()[1].in(au::degreesPerSecondInBodyFrame),
-				imu_gyr.value()[2].in(au::degreesPerSecondInBodyFrame),
-				imu_tmp.value().in(au::celsius_qty));
+//		auto imu_acc = imu.readAccelerometer();
+//		auto imu_gyr = imu.readGyroscope();
+//		auto imu_tmp = imu.readThermometer();
+//		auto imu_mag = imu.readRawMagnetometer();
+//		sprintf(buffer, "SPI IMU: (%f %f %f) (%f %f %f) (%f) *%d %d %d)\r\n",
+//				imu_acc.value()[0].in(au::metersPerSecondSquaredInBodyFrame),
+//				imu_acc.value()[1].in(au::metersPerSecondSquaredInBodyFrame),
+//				imu_acc.value()[2].in(au::metersPerSecondSquaredInBodyFrame),
+//				imu_gyr.value()[0].in(au::degreesPerSecondInBodyFrame),
+//				imu_gyr.value()[1].in(au::degreesPerSecondInBodyFrame),
+//				imu_gyr.value()[2].in(au::degreesPerSecondInBodyFrame),
+//				imu_tmp.value().in(au::celsius_qty),
+//				imu_mag[0], imu_mag[1], imu_mag[2]);
+
+		auto imu_chip = mag.readChipID();
+		auto imu_tmp = mag.readRawThermometer();
+		auto imu_mag = mag.readRawMagnetometer();
+		sprintf(buffer, "SPI IMU %d: (%d) (%ld %ld %ld)\r\n",
+				imu_chip.value(), imu_tmp, imu_mag[0], imu_mag[1], imu_mag[2]);
+
 
 //	    auto imu_id = imu.readChipID();
 //	    auto mag_id = mag.readChipID();

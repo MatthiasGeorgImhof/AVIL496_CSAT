@@ -89,6 +89,7 @@ enum class BMI270_REGISTERS : uint8_t {
 	INIT_DATA = 0x5E,
 	INTERNAL_ERROR = 0x5F,
 
+	IF_CONF = 0x6B,
 	PWR_CONF = 0x7C,
 	PWR_CTRL = 0x7D,
 	CMD = 0x7E,
@@ -570,21 +571,20 @@ public:
 	explicit BMI270(const Transport &transport) : transport_(transport) {}
 	bool initialize() const;
 	bool configure() const;
-	BMI270_STATUS readStatus() const;
 
+	BMI270_STATUS readStatus() const;
 	std::optional<ChipID> readChipID() const;
+
 	std::optional<AccelerationInBodyFrame> readAccelerometer() const;
 	std::optional<AngularVelocityInBodyFrame> readGyroscope() const;
-	std::optional<MagneticFieldInBodyFrame> readMagnetometer() const;
 	std::optional<Temperature> readThermometer() const;
 
 	std::array<int16_t, 3> readRawAccelerometer() const;
 	std::array<int16_t, 3> readRawGyroscope() const;
-	std::array<int16_t, 3> readRawMagnetometer() const;
 	uint16_t readRawThermometer() const;
 
 
-private:
+protected:
 	bool writeRegister(BMI270_REGISTERS reg, uint8_t value) const;
 	bool readRegister(BMI270_REGISTERS reg, uint8_t &value) const;
 	bool writeRegisterWithCheck(BMI270_REGISTERS reg, uint8_t value) const;
@@ -620,7 +620,7 @@ private:
 		return au::make_quantity<au::Celsius>(TMP_SHIFT + toInt16(lsb, msb) * LSB_PER_TMP);
 	}
 
-private:
+protected:
 	const Transport &transport_;
 
 	static constexpr uint8_t BMI270_READ_BIT = 0x80;
@@ -761,6 +761,7 @@ bool BMI270<Transport>::configure() const
 
 	if (! writeRegisterWithCheck(BMI270_REGISTERS::PWR_CTRL, BMI270_GYR_EN | BMI270_ACC_EN | BMI270_TMP_EN)) return false;
 	log(LOG_LEVEL_DEBUG, "BMI270 configured for ACC, GYR, TMP\r\n");
+
 	return true;
 }
 
@@ -895,6 +896,63 @@ uint16_t BMI270<Transport>::readRawThermometer() const
 }
 
 
+template <typename Transport>
+	requires RegisterModeTransport<Transport>
+class BMI270_MMC5983 : public BMI270<Transport>
+{
+public:
+	using BMI270<Transport>::BMI270;
 
+	bool configure() const;
+	std::optional<MagneticFieldInBodyFrame> readMagnetometer() const;
+	std::array<int16_t, 3> readRawMagnetometer() const;
+};
+
+template <typename Transport>
+requires RegisterModeTransport<Transport>
+bool BMI270_MMC5983<Transport>::configure() const
+{
+	BMI270<Transport>::configure();
+
+	BMI270<Transport>::writeRegisterWithCheck(BMI270_REGISTERS::IF_CONF, 0x00);
+	BMI270<Transport>::writeRegisterWithCheck(BMI270_REGISTERS::AUX_IF_CONF, 0x80);
+	BMI270<Transport>::writeRegisterWithCheck(BMI270_REGISTERS::PWR_CONF, 0x00);
+
+	constexpr uint8_t MMC5983_I2C = 0x30;
+	uint8_t mag_id, status;
+	BMI270<Transport>::writeRegisterWithCheck(BMI270_REGISTERS::AUX_DEV_ID, MMC5983_I2C<<1);
+	BMI270<Transport>::readRegister(BMI270_REGISTERS::STATUS, status);
+	BMI270<Transport>::writeRegisterWithCheck(BMI270_REGISTERS::AUX_RD_ADDR, 0x2f);
+	BMI270<Transport>::readRegister(BMI270_REGISTERS::AUX_DATA_X_LSB, mag_id);
+	log(LOG_LEVEL_DEBUG, "MMC5983 %d %d\r\n", status, mag_id);
+
+	BMI270<Transport>::writeRegisterWithCheck(BMI270_REGISTERS::AUX_IF_CONF, 0x03);
+	BMI270<Transport>::writeRegisterWithCheck(BMI270_REGISTERS::AUX_WR_DATA, 0b00001101);
+	BMI270<Transport>::writeRegisterWithCheck(BMI270_REGISTERS::AUX_WR_ADDR, 0x2b);
+	BMI270<Transport>::writeRegisterWithCheck(BMI270_REGISTERS::AUX_RD_ADDR, 0x00);
+
+	BMI270<Transport>::writeRegisterWithCheck(BMI270_REGISTERS::IF_CONF, 0x20);
+	if (! BMI270<Transport>::writeRegisterWithCheck(BMI270_REGISTERS::PWR_CTRL, BMI270<Transport>::BMI270_GYR_EN | BMI270<Transport>::BMI270_ACC_EN | BMI270<Transport>::BMI270_AUX_EN | BMI270<Transport>::BMI270_TMP_EN)) return false;
+	log(LOG_LEVEL_DEBUG, "BMI270 configured for ACC, GYR, TMP, AUX\r\n");
+
+	return true;
+}
+
+template <typename Transport>
+	requires RegisterModeTransport<Transport>
+std::array<int16_t, 3> BMI270_MMC5983<Transport>::readRawMagnetometer() const
+{
+    uint8_t tx_buf = static_cast<uint8_t>(BMI270_REGISTERS::AUX_DATA_X_LSB) | BMI270<Transport>::BMI270_READ_BIT;
+    uint8_t rx_buf[8]{}; // rx_buf[0] is a dummy byte to give the BMI time to respond
+
+    if (!BMI270<Transport>::transport_.write_then_read(&tx_buf, 1, rx_buf, sizeof(rx_buf))) {
+    	memset(rx_buf, 0, 2);
+    }
+
+    return std::array{
+    	BMI270_MMC5983<Transport>::toInt16(rx_buf[2], rx_buf[1]),
+    	BMI270_MMC5983<Transport>::toInt16(rx_buf[4], rx_buf[3]),
+		BMI270_MMC5983<Transport>::toInt16(rx_buf[6], rx_buf[5]) };
+}
 
 #endif /* INC_BMI270_H_ */
