@@ -1,5 +1,5 @@
-#ifndef __TRANSPORTS_HPP__
-#define __TRANSPORTS_HPP__
+#ifndef __TRANSPORT_HPP__
+#define __TRANSPORT_HPP__
 
 #ifdef __arm__
 #include "stm32l4xx_hal.h"
@@ -229,4 +229,4 @@ struct TransportTraits<UARTTransport<Config>>
     static constexpr TransportKind kind = TransportKind::UART;
 };
 
-#endif // __TRANSPORTS_HPP__
+#endif // __TRANSPORT_HPP__

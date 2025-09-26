@@ -7,7 +7,7 @@
 #include "au.hpp"
 #include "IMU.hpp"
 #include "MMC5983.hpp"
-#include "Drivers.hpp"
+#include "Transport.hpp"
 
 #ifdef __x86_64__
 #include "mock_hal.h"
@@ -146,6 +146,10 @@ public:
 	std::array<int16_t, 3> readRawGyroscope() const;
 	uint16_t readRawThermometer() const;
 
+public:
+    bool auxWriteRegister(BMI270_REGISTERS reg, uint8_t value) const { return writeRegister(reg, value); }
+    static constexpr uint8_t auxReadBit() { return BMI270_READ_BIT; }
+    const Transport& transport() const { return transport_; }
 
 protected:
 	bool writeRegister(BMI270_REGISTERS reg, uint8_t value) const;
@@ -457,123 +461,5 @@ uint16_t BMI270<Transport>::readRawThermometer() const
 
     return toUInt16(rx_buf[1], rx_buf[2]);
 }
-
-
-template <typename Transport>
-	requires RegisterModeTransport<Transport>
-class BMI270_MMC5983 : public BMI270<Transport>
-{
-public:
-	using BMI270<Transport>::BMI270;
-
-	bool configure() const;
-	std::optional<MagneticFieldInBodyFrame> readMagnetometer() const;
-	std::array<int32_t, 3> readRawMagnetometer() const;
-
-	int32_t toInt32(const uint8_t lsb, const uint8_t isb, const uint8_t msb) const
-	{
-		return ((msb << 10) | (isb << 2) | lsb) - NULL_VALUE;
-	}
-
-	au::QuantityF<au::TeslaInBodyFrame> convertMag(const uint8_t lsb, const int isb, const uint8_t msb) const
-	{
-		constexpr float COUNT_PER_GAUSS = 16384.f;
-		constexpr float GAUSS_PER_TESLA = 10000.f;
-		constexpr float COUNT_PER_TESLA = COUNT_PER_GAUSS * GAUSS_PER_TESLA;
-		constexpr float TESLA_PER_COUNT =  1.f / COUNT_PER_TESLA;
-		return au::make_quantity<au::TeslaInBodyFrame>(toInt32(lsb, isb, msb) * TESLA_PER_COUNT);
-	}
-
-private:
-	bool configureContinuousMode(uint8_t freq_code, uint8_t set_interval_code, bool auto_set) const;
-
-private:
-	static constexpr int32_t NULL_VALUE = 131072;
-	static constexpr uint8_t MMC5983_I2C = 0x30;
-	static constexpr uint8_t MMC5983_ID = 0x30;
-};
-
-template <typename Transport>
-requires RegisterModeTransport<Transport>
-bool BMI270_MMC5983<Transport>::configureContinuousMode(uint8_t freq_code, uint8_t set_interval_code, bool auto_set) const
-{
-    uint8_t ctrl1 = auto_set ? 0x80 : 0x00;
-    uint8_t ctrl2 = (auto_set ? 0x80 : 0x00) | (set_interval_code << 4) | (1 << 3) | freq_code;
-
-	BMI270<Transport>::writeRegister(BMI270_REGISTERS::AUX_WR_DATA, ctrl1);
-	BMI270<Transport>::writeRegister(BMI270_REGISTERS::AUX_WR_ADDR, static_cast<uint8_t>(MMC5983_REGISTERS::MMC5983_CONTROL1));
-
-	BMI270<Transport>::writeRegister(BMI270_REGISTERS::AUX_WR_DATA, ctrl2);
-	BMI270<Transport>::writeRegister(BMI270_REGISTERS::AUX_WR_ADDR, static_cast<uint8_t>(MMC5983_REGISTERS::MMC5983_CONTROL2));
-	return true;
-}
-
-template <typename Transport>
-requires RegisterModeTransport<Transport>
-bool BMI270_MMC5983<Transport>::configure() const
-{
-	BMI270<Transport>::configure();
-
-	uint8_t mag_id;
-
-	BMI270<Transport>::writeRegister(BMI270_REGISTERS::IF_CONF, 0b00100000); // 1. Enable AUX routing
-	BMI270<Transport>::writeRegister(BMI270_REGISTERS::AUX_IF_CONF, 0x80); // 2. Set AUX interface to manual mode, 1-byte read
-	BMI270<Transport>::writeRegister(BMI270_REGISTERS::PWR_CONF, 0x00); // 3. Power on AUX engine
-	BMI270<Transport>::writeRegister(BMI270_REGISTERS::PWR_CTRL, 0b00001110);
-	BMI270<Transport>::writeRegister(BMI270_REGISTERS::AUX_DEV_ID, MMC5983_I2C<<1); // 4. Set MMC5983 I2C address
-	BMI270<Transport>::writeRegister(BMI270_REGISTERS::AUX_RD_ADDR, 0x2F); // 5. Set read address to PRODUCTID
-	HAL_Delay(1);
-	BMI270<Transport>::readRegister(BMI270_REGISTERS::AUX_DATA_X_LSB, mag_id); // 6. Read result
-
-	if (mag_id != MMC5983_ID) {
-	    log(LOG_LEVEL_ERROR, "BMI270_MMC5983 ID mismatch: got %02x\r\n", mag_id);
-	    return false;
-	}
-
-	configureContinuousMode(/*freq_code=*/0b101, /*set_interval_code=*/0b011, /*auto_set=*/true);
-
-	BMI270<Transport>::writeRegister(BMI270_REGISTERS::AUX_RD_ADDR, 0x00);
-	BMI270<Transport>::writeRegister(BMI270_REGISTERS::IF_CONF, 0b00100000);
-	BMI270<Transport>::writeRegister(BMI270_REGISTERS::AUX_IF_CONF, 0x03);
-	BMI270<Transport>::writeRegister(BMI270_REGISTERS::PWR_CTRL, 0b00001111);
-
-	return true;
-}
-
-template <typename Transport>
-	requires RegisterModeTransport<Transport>
-std::optional<MagneticFieldInBodyFrame> BMI270_MMC5983<Transport>::readMagnetometer() const
-{
-    uint8_t tx_buf = static_cast<uint8_t>(BMI270_REGISTERS::AUX_DATA_X_LSB) | BMI270<Transport>::BMI270_READ_BIT;
-    uint8_t rx_buf[9]{}; // rx_buf[0] is a dummy byte to give the BMI time to respond
-
-    if (!MMC5983<Transport>::transport_.write_then_read(&tx_buf, 1, rx_buf, sizeof(rx_buf))) {
-    	return std::nullopt;
-    }
-
-    return MagneticFieldInBodyFrame{
-    	convertMag((rx_buf[7]>>6)&0b11, rx_buf[2], rx_buf[1]),
-    	convertMag((rx_buf[7]>>4)&0b11, rx_buf[4], rx_buf[3]),
-		convertMag((rx_buf[7]>>2)&0b11, rx_buf[6], rx_buf[5])
-    };
-}
-
-template <typename Transport>
-	requires RegisterModeTransport<Transport>
-std::array<int32_t, 3> BMI270_MMC5983<Transport>::readRawMagnetometer() const
-{
-	uint8_t tx_buf = static_cast<uint8_t>(BMI270_REGISTERS::AUX_DATA_X_LSB) | BMI270<Transport>::BMI270_READ_BIT;
-    uint8_t rx_buf[9]{}; // rx_buf[0] is a dummy byte to give the BMI time to respond
-
-    if (!BMI270<Transport>::transport_.write_then_read(&tx_buf, 1, rx_buf, sizeof(rx_buf))) {
-    	memset(rx_buf, 255, sizeof(rx_buf));
-    }
-
-    return std::array{
-    	toInt32((rx_buf[7]>>6)&0b11, rx_buf[2], rx_buf[1]),
-    	toInt32((rx_buf[7]>>4)&0b11, rx_buf[4], rx_buf[3]),
-		toInt32((rx_buf[7]>>2)&0b11, rx_buf[6], rx_buf[5]) };
-}
-
 
 #endif /* INC_BMI270_H_ */

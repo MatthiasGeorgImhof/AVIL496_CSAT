@@ -41,6 +41,7 @@
 #include "PowerSwitch.hpp"
 #include "PowerMonitor.hpp"
 #include "BMI270.hpp"
+#include "BMI270_MMC5983.hpp"
 #include "MMC5983.hpp"
 #include "MR25H10.hpp"
 #include "MMC5983.hpp"

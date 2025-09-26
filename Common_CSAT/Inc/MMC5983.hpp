@@ -6,7 +6,7 @@
 #include <optional>
 #include "au.hpp"
 #include "IMU.hpp"
-#include "Drivers.hpp"
+#include "Transport.hpp"
 
 #ifdef __x86_64__
 #include "mock_hal.h"
@@ -28,6 +28,45 @@ enum class MMC5983_REGISTERS : uint8_t
 	MMC5983_CONTROL2 = 0x0b,
 	MMC5983_CONTROL3 = 0x0c,
 	MMC5983_PRODUCTID = 0x2F,
+};
+
+class MMC5983Core {
+public:
+    static constexpr int32_t NULL_VALUE = 131072;
+
+    static int32_t toInt32(uint8_t lsb, uint8_t isb, uint8_t msb) {
+        return ((msb << 10) | (isb << 2) | lsb) - NULL_VALUE;
+    }
+
+    static au::QuantityF<au::TeslaInBodyFrame> convertMag(uint8_t lsb, uint8_t isb, uint8_t msb) {
+        constexpr float COUNT_PER_GAUSS = 16384.f;
+        constexpr float GAUSS_PER_TESLA = 10000.f;
+        constexpr float TESLA_PER_COUNT = 1.f / (COUNT_PER_GAUSS * GAUSS_PER_TESLA);
+        return au::make_quantity<au::TeslaInBodyFrame>(toInt32(lsb, isb, msb) * TESLA_PER_COUNT);
+    }
+
+	static au::QuantityF<au::Celsius> convertTmp(const uint8_t value)
+	{
+		constexpr float LSB_PER_TMP = 0.8f;
+		constexpr float TMP_SHIFT = -75.0f;
+		return au::make_quantity<au::Celsius>(TMP_SHIFT + value * LSB_PER_TMP);
+	}
+
+    static MagneticFieldInBodyFrame parseMagnetometerData(const uint8_t* buf) {
+        return MagneticFieldInBodyFrame{
+            convertMag((buf[6] >> 6) & 0b11, buf[1], buf[0]),
+            convertMag((buf[6] >> 4) & 0b11, buf[3], buf[2]),
+            convertMag((buf[6] >> 2) & 0b11, buf[5], buf[4])
+        };
+    }
+
+    static std::array<int32_t, 3> parseRawMagnetometerData(const uint8_t* buf) {
+        return {
+            toInt32((buf[6] >> 6) & 0b11, buf[1], buf[0]),
+            toInt32((buf[6] >> 4) & 0b11, buf[3], buf[2]),
+            toInt32((buf[6] >> 2) & 0b11, buf[5], buf[4])
+        };
+    }
 };
 
 template <typename Transport>
@@ -55,31 +94,9 @@ private:
 	bool writeRegister(MMC5983_REGISTERS reg, uint8_t value) const;
 	bool readRegister(MMC5983_REGISTERS reg, uint8_t &value) const;
 
-	int32_t toInt32(const uint8_t lsb, const uint8_t isb, const uint8_t msb) const
-	{
-		return ((msb << 10) | (isb << 2) | lsb) - NULL_VALUE;
-	}
-
-	au::QuantityF<au::TeslaInBodyFrame> convertMag(const uint8_t lsb, const int isb, const uint8_t msb) const
-	{
-		constexpr float COUNT_PER_GAUSS = 16384.f;
-		constexpr float GAUSS_PER_TESLA = 10000.f;
-		constexpr float COUNT_PER_TESLA = COUNT_PER_GAUSS * GAUSS_PER_TESLA;
-		constexpr float TESLA_PER_COUNT =  1.f / COUNT_PER_TESLA;
-		return au::make_quantity<au::TeslaInBodyFrame>(toInt32(lsb, isb, msb) * TESLA_PER_COUNT);
-	}
-
-	au::QuantityF<au::Celsius> convertTmp(const uint8_t value) const
-	{
-		constexpr float LSB_PER_TMP = 0.8f;
-		constexpr float TMP_SHIFT = -75.0f;
-		return au::make_quantity<au::Celsius>(TMP_SHIFT + value * LSB_PER_TMP);
-	}
-
 private:
 	const Transport &transport_;
 	static constexpr uint8_t MMC5983_READ_BIT = 0x80;
-	static constexpr int32_t NULL_VALUE = 131072;
 };
 
 template <typename Transport>
@@ -154,11 +171,7 @@ std::optional<MagneticFieldInBodyFrame> MMC5983<Transport>::readMagnetometer() c
     	return std::nullopt;
     }
 
-    return MagneticFieldInBodyFrame{
-    	convertMag((rx_buf[6]>>6)&0b11, rx_buf[1], rx_buf[0]),
-    	convertMag((rx_buf[6]>>4)&0b11, rx_buf[3], rx_buf[2]),
-		convertMag((rx_buf[6]>>2)&0b11, rx_buf[5], rx_buf[4])
-    };
+    return MMC5983Core::parseMagnetometerData(rx_buf);
 }
 
 template <typename Transport>
@@ -172,7 +185,7 @@ std::optional<Temperature> MMC5983<Transport>::readThermometer() const
         return std::nullopt;
     }
 
-    return Temperature{ convertTmp(rx_buf[0]) };
+    return Temperature{ MMC5983Core::convertTmp(rx_buf[0]) };
 }
 
 template <typename Transport>
@@ -186,10 +199,7 @@ std::array<int32_t, 3> MMC5983<Transport>::readRawMagnetometer() const
     	memset(rx_buf, 0, sizeof(rx_buf));
     }
 
-    return std::array{
-    	toInt32((rx_buf[6]>>6)&0b11, rx_buf[1], rx_buf[0]),
-    	toInt32((rx_buf[6]>>4)&0b11, rx_buf[3], rx_buf[2]),
-		toInt32((rx_buf[6]>>2)&0b11, rx_buf[5], rx_buf[4]) };
+    return MMC5983Core::parseRawMagnetometerData(rx_buf);
 }
 
 template <typename Transport>
