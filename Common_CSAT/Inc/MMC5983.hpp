@@ -38,6 +38,7 @@ public:
 	MMC5983() = delete;
 	explicit MMC5983(const Transport &transport) : transport_(transport) {}
 	bool initialize() const;
+	bool configureContinuousMode(uint8_t freq_code, uint8_t set_interval_code, bool auto_set) const;
 
 	uint8_t readStatus() const;
 	std::optional<ChipID> readChipID() const;
@@ -48,6 +49,8 @@ public:
 	std::array<int32_t, 3> readRawMagnetometer() const;
 	uint8_t readRawThermometer() const;
 
+	bool performSet() const { return writeRegister(MMC5983_REGISTERS::MMC5983_CONTROL0, 0x08); }
+
 private:
 	bool writeRegister(MMC5983_REGISTERS reg, uint8_t value) const;
 	bool readRegister(MMC5983_REGISTERS reg, uint8_t &value) const;
@@ -57,15 +60,13 @@ private:
 		return ((msb << 10) | (isb << 2) | lsb) - NULL_VALUE;
 	}
 
-//	uint32_t toUInt32(const uint8_t lsb, const uint8_t isb, const uint8_t msb) const
-//	{
-//		return ((msb << 10) | (isb << 2) | lsb);
-//	}
-
 	au::QuantityF<au::TeslaInBodyFrame> convertMag(const uint8_t lsb, const int isb, const uint8_t msb) const
 	{
-		constexpr float LSB_PER_DPS = 16.4f;  // ±2000°/s range
-		return au::make_quantity<au::DegreesPerSecondInBodyFrame>(toInt32(lsb, isb, msb) / LSB_PER_DPS);
+		constexpr float COUNT_PER_GAUSS = 16384.f;
+		constexpr float GAUSS_PER_TESLA = 10000.f;
+		constexpr float COUNT_PER_TESLA = COUNT_PER_GAUSS * GAUSS_PER_TESLA;
+		constexpr float TESLA_PER_COUNT =  1.f / COUNT_PER_TESLA;
+		return au::make_quantity<au::TeslaInBodyFrame>(toInt32(lsb, isb, msb) * TESLA_PER_COUNT);
 	}
 
 	au::QuantityF<au::Celsius> convertTmp(const uint8_t value) const
@@ -93,23 +94,29 @@ template <typename Transport>
 	requires RegisterModeTransport<Transport>
 bool MMC5983<Transport>::readRegister(MMC5983_REGISTERS reg, uint8_t &value) const
 {
-    uint8_t tx_buf[1] = {static_cast<uint8_t>(static_cast<uint8_t>(reg) | MMC5983_READ_BIT)};
+    uint8_t tx_buf[1] = {static_cast<uint8_t>(reg) | MMC5983_READ_BIT};
     uint8_t rx_buf[2]{};
     bool ok = transport_.write_then_read(tx_buf, sizeof(tx_buf), rx_buf, sizeof(rx_buf));
+    if (! ok) return false;
     value = rx_buf[1];
-    return ok;
+    return true;
+}
+
+template <typename Transport>
+	requires RegisterModeTransport<Transport>
+bool MMC5983<Transport>::configureContinuousMode(uint8_t freq_code, uint8_t set_interval_code, bool auto_set) const
+{
+    uint8_t ctrl1 = auto_set ? 0x80 : 0x00;
+    uint8_t ctrl2 = (auto_set ? 0x80 : 0x00) | (set_interval_code << 4) | (1 << 3) | freq_code;
+    return writeRegister(MMC5983_REGISTERS::MMC5983_CONTROL1, ctrl1) &&
+           writeRegister(MMC5983_REGISTERS::MMC5983_CONTROL2, ctrl2);
 }
 
 template <typename Transport>
 	requires RegisterModeTransport<Transport>
 bool MMC5983<Transport>::initialize() const
 {
-	writeRegister(MMC5983_REGISTERS::MMC5983_CONTROL1, 0x00);
-	writeRegister(MMC5983_REGISTERS::MMC5983_CONTROL2, 0x00);
-
-	writeRegister(MMC5983_REGISTERS::MMC5983_CONTROL0, 0x08);
-	HAL_Delay(10);
-	return true;
+	return configureContinuousMode(/*freq_code=*/0b101, /*set_interval_code=*/0b011, /*auto_set=*/true);
 }
 
 template <typename Transport>
@@ -125,6 +132,33 @@ std::optional<ChipID> MMC5983<Transport>::readChipID() const
 	}
 
 	return rx_buf[0];
+}
+
+template <typename Transport>
+    requires RegisterModeTransport<Transport>
+uint8_t MMC5983<Transport>::readStatus() const
+{
+    uint8_t value = 0;
+    readRegister(MMC5983_REGISTERS::MMC5983_STATUS, value);
+    return value;
+}
+
+template <typename Transport>
+	requires RegisterModeTransport<Transport>
+std::optional<MagneticFieldInBodyFrame> MMC5983<Transport>::readMagnetometer() const
+{
+	uint8_t tx_buf = static_cast<uint8_t>(MMC5983_REGISTERS::MMC5983_XOUT0) | MMC5983_READ_BIT;
+    uint8_t rx_buf[8]{};
+
+    if (!MMC5983<Transport>::transport_.write_then_read(&tx_buf, 1, rx_buf, sizeof(rx_buf))) {
+    	return std::nullopt;
+    }
+
+    return MagneticFieldInBodyFrame{
+    	convertMag((rx_buf[6]>>6)&0b11, rx_buf[1], rx_buf[0]),
+    	convertMag((rx_buf[6]>>4)&0b11, rx_buf[3], rx_buf[2]),
+		convertMag((rx_buf[6]>>2)&0b11, rx_buf[5], rx_buf[4])
+    };
 }
 
 template <typename Transport>
@@ -145,9 +179,6 @@ template <typename Transport>
 	requires RegisterModeTransport<Transport>
 std::array<int32_t, 3> MMC5983<Transport>::readRawMagnetometer() const
 {
-    writeRegister(MMC5983_REGISTERS::MMC5983_CONTROL0, 0b01);
-    HAL_Delay(25);
-
 	uint8_t tx_buf = static_cast<uint8_t>(MMC5983_REGISTERS::MMC5983_XOUT0) | MMC5983_READ_BIT;
     uint8_t rx_buf[8]{};
 
@@ -156,9 +187,9 @@ std::array<int32_t, 3> MMC5983<Transport>::readRawMagnetometer() const
     }
 
     return std::array{
-    	MMC5983<Transport>::toInt32((rx_buf[6]>>6)&0b11, rx_buf[1], rx_buf[0]),
-    	MMC5983<Transport>::toInt32((rx_buf[6]>>4)&0b11, rx_buf[3], rx_buf[2]),
-		MMC5983<Transport>::toInt32((rx_buf[6]>>2)&0b11, rx_buf[5], rx_buf[4]) };
+    	toInt32((rx_buf[6]>>6)&0b11, rx_buf[1], rx_buf[0]),
+    	toInt32((rx_buf[6]>>4)&0b11, rx_buf[3], rx_buf[2]),
+		toInt32((rx_buf[6]>>2)&0b11, rx_buf[5], rx_buf[4]) };
 }
 
 template <typename Transport>
@@ -166,7 +197,7 @@ template <typename Transport>
 uint8_t MMC5983<Transport>::readRawThermometer() const
 {
     writeRegister(MMC5983_REGISTERS::MMC5983_CONTROL0, 0b10);
-    HAL_Delay(25);
+    HAL_Delay(5);
 
 	uint8_t tx_buf = static_cast<uint8_t>(MMC5983_REGISTERS::MMC5983_TOUT) | MMC5983_READ_BIT;
     uint8_t rx_buf[1]{};
