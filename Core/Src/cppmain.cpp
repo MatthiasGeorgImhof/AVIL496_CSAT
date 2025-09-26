@@ -210,10 +210,18 @@ void cppmain()
     MonitorTransport monitor_transport;
 	PowerMonitor<MonitorTransport> power_monitor(monitor_transport);
 
+	constexpr MagnetometerCalibration aux_mmc_calibration = {
+	    { au::make_quantity<au::TeslaInBodyFrame>(2.05216351e-05f), au::make_quantity<au::TeslaInBodyFrame>(1.88477490e-05f), au::make_quantity<au::TeslaInBodyFrame>(2.57038804e-07f) },
+	    {{
+	        { 0.89675333f,  0.0026198f,  -0.00259815f },
+	        { 0.0026198f,   0.91909188f,  0.003695f    },
+	        { -0.00259815f, 0.003695f,    0.87256288f  }
+	    }}
+	};
 	using IMUConfigType = SPI_Config<hspi2, GPIO_SPI2_GYRO_CS_Pin, 128>;
 	IMUConfigType imu_config(GPIOD);
 	SPITransport<IMUConfigType> imu_transport(imu_config);
-	BMI270_MMC5983<SPITransport<IMUConfigType>> imu(imu_transport);
+	BMI270_MMC5983<SPITransport<IMUConfigType>> imu(imu_transport, aux_mmc_calibration);
 	(void) imu.readChipID();
 	(void) imu.readChipID();
 	HAL_Delay(5000);
@@ -221,10 +229,18 @@ void cppmain()
 	assert(imu.configure());
 
 
+	constexpr MagnetometerCalibration spi_mmc_calibration = {
+		{ au::make_quantity<au::TeslaInBodyFrame>(-1.28120647e-06f), au::make_quantity<au::TeslaInBodyFrame>(1.11679164e-05f), au::make_quantity<au::TeslaInBodyFrame>(5.11724020e-06f) },
+		{{
+				{ 0.99498789f, 0.01241906f, 0.00664294f, },
+				 { 0.01241906f, 1.00374665f, 0.00229451f,},
+				 { 0.00664294f, 0.00229451f, 0.95963044f}
+		}}
+	};
 	using MagConfigType = SPI_Config<hspi1, GPIO_SPI1_MAG_CS_Pin, 128>;
 	MagConfigType mag_config(GPIOE);
 	SPITransport<MagConfigType> mag_transport(mag_config);
-    MMC5983<SPITransport<MagConfigType>> mag(mag_transport);
+    MMC5983<SPITransport<MagConfigType>> mag(mag_transport, spi_mmc_calibration);
 	assert(mag.initialize());
 
 //	using MramConfig = SPI_Config<hspi3, &GPIOG_object, GPIO_SPI3_MRAM_CS_Pin, 128>;
@@ -261,13 +277,13 @@ void cppmain()
 		auto imu_acc = imu.readAccelerometer();
 		auto imu_gyr = imu.readGyroscope();
 		auto imu_tmp = imu.readThermometer();
-		auto imu_mag = imu.readRawMagnetometer();
+		auto imu_mag = imu.readMagnetometer();
 
 //		auto mag_chip = mag.readChipID();
 //		auto mag_tmp = mag.readRawThermometer();
-		auto mag_mag = mag.readRawMagnetometer();
+		auto mag_mag = mag.readMagnetometer();
 
-		sprintf(buffer, "SPI IMU: (%f %f %f) (%f %f %f) (%f) (%ld %ld %ld) (%ld %ld %ld)\r\n",
+		sprintf(buffer, "SPI IMU: (%f %f %f) (%f %f %f) (%f) (%e %e %e) (%e %e %e)\r\n",
 				imu_acc.value()[0].in(au::metersPerSecondSquaredInBodyFrame),
 				imu_acc.value()[1].in(au::metersPerSecondSquaredInBodyFrame),
 				imu_acc.value()[2].in(au::metersPerSecondSquaredInBodyFrame),
@@ -275,8 +291,8 @@ void cppmain()
 				imu_gyr.value()[1].in(au::degreesPerSecondInBodyFrame),
 				imu_gyr.value()[2].in(au::degreesPerSecondInBodyFrame),
 				imu_tmp.value().in(au::celsius_qty),
-				imu_mag[0], imu_mag[1], imu_mag[2],
-				mag_mag[0], mag_mag[1], mag_mag[2]);
+				imu_mag.value()[0].in(au::nano(au::teslaInBodyFrame)), imu_mag.value()[1].in(au::nano(au::teslaInBodyFrame)), imu_mag.value()[2].in(au::nano(au::teslaInBodyFrame)),
+				mag_mag.value()[0].in(au::nano(au::teslaInBodyFrame)), mag_mag.value()[1].in(au::nano(au::teslaInBodyFrame)), mag_mag.value()[2].in(au::nano(au::teslaInBodyFrame)));
 
 //		HAL_Delay(250);
 //		auto mag_chip = mag.readChipID();
@@ -297,6 +313,6 @@ void cppmain()
 //			  data.manufacturer_id, data.die_id, data.voltage_shunt_uV, data.voltage_bus_mV, data.power_mW, data.current_uA);
 
 		CDC_Transmit_FS((uint8_t*) buffer, strlen(buffer));
-		HAL_Delay(125);
+		HAL_Delay(100);
 	}
 }

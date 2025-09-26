@@ -70,8 +70,8 @@ public:
     using AuxTransport = BMI270AuxTransport<BMI270Type>;
     using Magnetometer = MMC5983<AuxTransport>;
 
-    explicit BMI270_MMC5983(const Transport& transport)
-        : BMI270Type(transport), aux_(*this), mag_(aux_) {}
+    explicit BMI270_MMC5983(const Transport& transport, const MagnetometerCalibration& calibration = DefaultMMC5983Calibration)
+        : BMI270Type(transport), aux_(*this), mag_(aux_, calibration) {}
 
     bool configure() const;
     std::optional<MagneticFieldInBodyFrame> readMagnetometer() const { return mag_.readMagnetometer(); }

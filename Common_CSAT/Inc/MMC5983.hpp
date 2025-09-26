@@ -30,6 +30,20 @@ enum class MMC5983_REGISTERS : uint8_t
 	MMC5983_PRODUCTID = 0x2F,
 };
 
+#include <array>
+
+struct MagnetometerCalibration {
+	MagneticFieldInBodyFrame bias;
+    std::array<std::array<float, 3>, 3> scale;
+};
+
+constexpr MagnetometerCalibration DefaultMMC5983Calibration = {
+    { au::make_quantity<au::TeslaInBodyFrame>(0.0f), au::make_quantity<au::TeslaInBodyFrame>(0.0f), au::make_quantity<au::TeslaInBodyFrame>(0.0f) },
+    {{
+        {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}
+    }}
+};
+
 class MMC5983Core {
 public:
     static constexpr int32_t NULL_VALUE = 131072;
@@ -75,7 +89,7 @@ class MMC5983
 {
 public:
 	MMC5983() = delete;
-	explicit MMC5983(const Transport &transport) : transport_(transport) {}
+	explicit MMC5983(const Transport &transport, const MagnetometerCalibration& calibration = DefaultMMC5983Calibration) : transport_(transport), calibration_(calibration) {}
 	bool initialize() const;
 	bool configureContinuousMode(uint8_t freq_code, uint8_t set_interval_code, bool auto_set) const;
 
@@ -96,6 +110,7 @@ private:
 
 private:
 	const Transport &transport_;
+	const MagnetometerCalibration& calibration_;
 	static constexpr uint8_t MMC5983_READ_BIT = 0x80;
 };
 
@@ -171,7 +186,16 @@ std::optional<MagneticFieldInBodyFrame> MMC5983<Transport>::readMagnetometer() c
     	return std::nullopt;
     }
 
-    return MMC5983Core::parseMagnetometerData(rx_buf);
+    auto uncalibrated = MMC5983Core::parseMagnetometerData(rx_buf);
+    uncalibrated[0] -= calibration_.bias[0];
+    uncalibrated[1] -= calibration_.bias[1];
+    uncalibrated[2] -= calibration_.bias[2];
+
+    return MagneticFieldInBodyFrame {
+    	uncalibrated[0]*calibration_.scale[0][0] + uncalibrated[1]*calibration_.scale[0][1] + uncalibrated[2]*calibration_.scale[0][2],
+    	uncalibrated[0]*calibration_.scale[1][0] + uncalibrated[1]*calibration_.scale[1][1] + uncalibrated[2]*calibration_.scale[1][2],
+    	uncalibrated[0]*calibration_.scale[2][0] + uncalibrated[1]*calibration_.scale[2][1] + uncalibrated[2]*calibration_.scale[2][2]
+    };
 }
 
 template <typename Transport>
