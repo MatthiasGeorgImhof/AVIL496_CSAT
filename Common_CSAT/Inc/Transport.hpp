@@ -3,6 +3,7 @@
 
 #ifdef __arm__
 #include "stm32l4xx_hal.h"
+#include "usb_device.h"
 #elif __x86_64__
 #include "mock_hal.h"
 #endif
@@ -10,8 +11,6 @@
 #include <cstdint>
 #include <cstddef>
 #include <type_traits>
-
-#include "usb_device.h"
 
 // Mode tags
 struct register_mode_tag
@@ -60,7 +59,7 @@ public:
 
     bool write(const uint8_t *tx_buf, uint16_t tx_len) const
     {
-        return HAL_I2C_Master_Transmit(&Config::handle(), Config::address, const_cast<uint8_t*>(tx_buf), tx_len, Config::timeout) == HAL_OK;
+        return HAL_I2C_Master_Transmit(&Config::handle(), Config::address, const_cast<uint8_t *>(tx_buf), tx_len, Config::timeout) == HAL_OK;
     }
 
     bool write_then_read(const uint8_t *tx_buf, uint16_t tx_len, uint8_t *rx_buf, uint16_t rx_len) const
@@ -79,8 +78,8 @@ template <SPI_HandleTypeDef &HandleRef, uint16_t Pin,
 struct SPI_Config
 {
     SPI_Config() = delete;
-    SPI_Config(GPIO_TypeDef* csport) : csPort(csport) {}
-	using transport_tag = spi_tag;
+    SPI_Config(GPIO_TypeDef *csport) : csPort(csport) {}
+    using transport_tag = spi_tag;
     using mode_tag = register_mode_tag;
 
     static SPI_HandleTypeDef &handle() { return HandleRef; }
@@ -89,7 +88,7 @@ struct SPI_Config
     static constexpr std::size_t max_transfer_size = MaxTransferSize;
 
 public:
-    GPIO_TypeDef* csPort;
+    GPIO_TypeDef *csPort;
 
     static_assert(std::is_same_v<decltype(HandleRef), SPI_HandleTypeDef &>, "Handle must be SPI_HandleTypeDef&");
     static_assert(Timeout > 0 && Timeout < 10000, "Timeout must be a reasonable value");
@@ -103,9 +102,9 @@ class SPITransport
 public:
     using config_type = Config;
 
-    explicit SPITransport(const Config& cfg) : config(cfg) { deselect(); }
+    explicit SPITransport(const Config &cfg) : config(cfg) { deselect(); }
 
-    bool write(const uint8_t *tx_buf, uint16_t tx_len) const
+    bool write(uint8_t *tx_buf, uint16_t tx_len) const
     {
         select();
         bool ok = HAL_SPI_Transmit(&Config::handle(), tx_buf, tx_len, Config::timeout) == HAL_OK;

@@ -21,6 +21,7 @@ LIBS =				-lcanardd -lserardd -ludpardd -lo1heapd
 # Source and object files
 TEST_FILES = TestArrayList.cpp \
 			 TestBMI270.cpp \
+			 TestBMI270_MMC5983.cpp \
 			 TestBlobStore.cpp \
 			 TestBoxSet.cpp \
 			 TestBoxSetIterator.cpp \
@@ -30,7 +31,7 @@ TEST_FILES = TestArrayList.cpp \
 			 TestCoordinateTransformations.cpp \
 			 TestCyphal.cpp \
 			 TestCyphalSubscriptions.cpp \
-			 TestDrivers.cpp \
+			 TestTransport.cpp \
 			 TestFileAccess.cpp \
 			 TestFileSource.cpp \
 			 TestGNSS.cpp \
@@ -47,6 +48,8 @@ TEST_FILES = TestArrayList.cpp \
 			 TestLogger.cpp \
 			 TestLoggerCyphal.cpp \
 			 TestMainLoop.cpp \
+			 TestMMC5983.cpp \
+			 TestMR25H10.cpp \
 			 TestMockHal.cpp \
 			 TestO1HeapAllocator.cpp \
 			 TestOrientationTracker.cpp \
@@ -202,6 +205,33 @@ $(BIN_DIR)/TestBMI270 : $(BIN_DIR)/TestBMI270.o $(MOCK_HAL_OBJECTS) # Link the o
 	@echo "Linking $@"
 	$(CXX) $(LIBS_PATH) -o $@ $(BIN_DIR)/TestBMI270.o $(MOCK_HAL_OBJECTS) $(LIBS)
 
+# Rule for TestBMI270_MMC5983 with extra sources
+$(BIN_DIR)/TestBMI270_MMC5983.o : TestBMI270_MMC5983.cpp
+	@echo "Compiling $<"
+	$(CXX) -c $< $(CXXFLAGS) $(EXTRA_FLAGS) $(EXTRA_EXTRA_FLAGS) $(INCLUDE_PATHS) -o $@
+
+$(BIN_DIR)/TestBMI270_MMC5983 : $(BIN_DIR)/TestBMI270_MMC5983.o $(MOCK_HAL_OBJECTS) # Link the object file
+	@echo "Linking $@"
+	$(CXX) $(LIBS_PATH) -o $@ $(BIN_DIR)/TestBMI270_MMC5983.o $(MOCK_HAL_OBJECTS) $(LIBS)
+
+# Rule for TestMMC5983 with extra sources
+$(BIN_DIR)/TestMMC5983.o : TestMMC5983.cpp
+	@echo "Compiling $<"
+	$(CXX) -c $< $(CXXFLAGS) $(EXTRA_FLAGS) $(EXTRA_EXTRA_FLAGS) $(INCLUDE_PATHS) -o $@
+
+$(BIN_DIR)/TestMMC5983 : $(BIN_DIR)/TestMMC5983.o $(MOCK_HAL_OBJECTS) # Link the object file
+	@echo "Linking $@"
+	$(CXX) $(LIBS_PATH) -o $@ $(BIN_DIR)/TestMMC5983.o $(MOCK_HAL_OBJECTS) $(LIBS)
+
+# Rule for TestMR25H10 with extra sources
+$(BIN_DIR)/TestMR25H10.o : TestMR25H10.cpp
+	@echo "Compiling $<"
+	$(CXX) -c $< $(CXXFLAGS) $(EXTRA_FLAGS) $(EXTRA_EXTRA_FLAGS) $(INCLUDE_PATHS) -o $@
+
+$(BIN_DIR)/TestMR25H10 : $(BIN_DIR)/TestMR25H10.o $(MOCK_HAL_OBJECTS) # Link the object file
+	@echo "Linking $@"
+	$(CXX) $(LIBS_PATH) -o $@ $(BIN_DIR)/TestMR25H10.o $(MOCK_HAL_OBJECTS) $(LIBS)
+
 # Rule for TestCameraSwitch with extra sources
 $(BIN_DIR)/TestCameraSwitch.o : TestCameraSwitch.cpp
 	@echo "Compiling $<"
@@ -211,14 +241,14 @@ $(BIN_DIR)/TestCameraSwitch : $(BIN_DIR)/TestCameraSwitch.o $(MOCK_HAL_OBJECTS) 
 	@echo "Linking $@"
 	$(CXX) $(LIBS_PATH) -o $@ $(BIN_DIR)/TestCameraSwitch.o $(MOCK_HAL_OBJECTS) $(LIBS)
 
-# Rule for TestDrivers with extra sources
-$(BIN_DIR)/TestDrivers.o : TestDrivers.cpp
+# Rule for TestTransport with extra sources
+$(BIN_DIR)/TestTransport.o : TestTransport.cpp
 	@echo "Compiling $<"
 	$(CXX) -c $< $(CXXFLAGS) $(EXTRA_FLAGS) $(EXTRA_EXTRA_FLAGS) $(INCLUDE_PATHS) -o $@
 
-$(BIN_DIR)/TestDrivers : $(BIN_DIR)/TestDrivers.o $(MOCK_HAL_OBJECTS) # Link the object file
+$(BIN_DIR)/TestTransport : $(BIN_DIR)/TestTransport.o $(MOCK_HAL_OBJECTS) # Link the object file
 	@echo "Linking $@"
-	$(CXX) $(LIBS_PATH) -o $@ $(BIN_DIR)/TestDrivers.o $(MOCK_HAL_OBJECTS) $(LIBS)
+	$(CXX) $(LIBS_PATH) -o $@ $(BIN_DIR)/TestTransport.o $(MOCK_HAL_OBJECTS) $(LIBS)
 
 # Rule for TestHSClockSwitch with extra sources
 $(BIN_DIR)/TestHSClockSwitch.o : TestHSClockSwitch.cpp

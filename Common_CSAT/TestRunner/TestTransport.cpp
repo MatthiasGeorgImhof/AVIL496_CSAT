@@ -1,7 +1,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest/doctest.h"
 
-#include "Drivers.hpp"
+#include "Transport.hpp"
 #include "mock_hal.h"
 
 // ─────────────────────────────────────────────
@@ -48,14 +48,15 @@ TEST_CASE("I2CTransport write_then_read() performs atomic transaction")
 
 SPI_HandleTypeDef mock_spi;
 GPIO_TypeDef GPIOA;
-using TestSPIConfig = SPI_Config<mock_spi, &GPIOA, GPIO_PIN_5>;
+using TestSPIConfig = SPI_Config<mock_spi, GPIO_PIN_5, 128>;
 using TestSPITransport = SPITransport<TestSPIConfig>;
 
 TEST_CASE("SPITransport write() transmits payload with CS toggled")
 {
     clear_spi_tx_buffer();
 
-    TestSPITransport transport;
+    TestSPIConfig config(&GPIOA);  // Pass mock GPIO port
+    TestSPITransport transport(config);
     uint8_t tx[] = {0x7E, 0x01}; // e.g. command + argument
     CHECK(transport.write(tx, sizeof(tx)) == true);
 
@@ -73,12 +74,16 @@ TEST_CASE("SPITransport write_then_read() performs atomic transaction with CS he
     uint8_t injected[] = {0x55, 0x66};
     inject_spi_rx_data(injected, sizeof(injected));
 
-    TestSPITransport transport;
+    TestSPIConfig config(&GPIOA);  // Pass mock GPIO port
+    TestSPITransport transport(config);
     uint8_t rx[2] = {};
     CHECK(transport.write_then_read(tx, sizeof(tx), rx, sizeof(rx)) == true);
 
-    CHECK(get_spi_tx_buffer_count() == 1);
-    CHECK(get_spi_tx_buffer()[0] == 0x0F);
+    CHECK(get_spi_tx_buffer()[0] == 0x0F);  // command
+    CHECK(get_spi_tx_buffer()[1] == 0x00);  // dummy
+    CHECK(get_spi_tx_buffer()[2] == 0x00);  // dummy
+    CHECK(get_spi_tx_buffer_count() == 1+2);
+
     CHECK(rx[0] == 0x55);
     CHECK(rx[1] == 0x66);
 }
