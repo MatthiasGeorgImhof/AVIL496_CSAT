@@ -6,7 +6,6 @@
 #include <optional>
 #include "au.hpp"
 #include "IMU.hpp"
-#include "MMC5983.hpp"
 #include "Transport.hpp"
 #include "Logger.hpp"
 
@@ -149,13 +148,15 @@ public:
 	uint16_t readRawThermometer() const;
 
 public:
-	bool auxWriteRegister(BMI270_REGISTERS reg, uint8_t value) const { return writeRegister(reg, value); }
-	static constexpr uint8_t auxReadBit() { return BMI270_READ_BIT; }
-	const Transport &transport() const { return transport_; }
+	// bool auxWriteRegister(BMI270_REGISTERS reg, uint8_t value) const { return writeRegister(reg, value); }
+	// static constexpr uint8_t auxReadBit() { return BMI270_READ_BIT; }
+	// const Transport &transport() const { return transport_; }
 
-protected:
+public:
+	const Transport& getTransport() const { return transport_; }	
 	bool writeRegister(BMI270_REGISTERS reg, uint8_t value) const;
 	bool readRegister(BMI270_REGISTERS reg, uint8_t &value) const;
+	bool readRegisters(BMI270_REGISTERS reg, uint8_t *rx_buf, uint16_t rx_len) const;
 	bool writeRegisterWithCheck(BMI270_REGISTERS reg, uint8_t value) const;
 	bool writeRegisterWithRepeat(BMI270_REGISTERS reg, uint8_t value) const;
 
@@ -220,11 +221,18 @@ bool BMI270<Transport>::writeRegister(BMI270_REGISTERS reg, uint8_t value) const
 
 template <typename Transport>
 	requires RegisterModeTransport<Transport>
-bool BMI270<Transport>::readRegister(BMI270_REGISTERS reg, uint8_t &value) const
+bool BMI270<Transport>::readRegisters(BMI270_REGISTERS reg, uint8_t *rx_buf, uint16_t rx_len) const
 {
 	uint8_t tx_buf[1] = {static_cast<uint8_t>(static_cast<uint8_t>(reg) | BMI270_READ_BIT)};
+	return transport_.write_then_read(tx_buf, sizeof(tx_buf), rx_buf, rx_len);
+}
+
+template <typename Transport>
+	requires RegisterModeTransport<Transport>
+bool BMI270<Transport>::readRegister(BMI270_REGISTERS reg, uint8_t &value) const
+{
 	uint8_t rx_buf[2]{};
-	bool ok = transport_.write_then_read(tx_buf, sizeof(tx_buf), rx_buf, sizeof(rx_buf));
+	bool ok = readRegisters(reg, rx_buf, sizeof(rx_buf));
 	value = rx_buf[1];
 	return ok;
 }

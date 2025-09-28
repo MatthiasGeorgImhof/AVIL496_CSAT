@@ -252,34 +252,34 @@ TEST_CASE("BMI270 readRawThermometer() returns correct raw thermometer value") {
     CHECK(result == 512);
 }
 
-TEST_CASE("BMI270 auxWriteRegister() writes the correct register and value") {
-    clear_spi_tx_buffer();
+// TEST_CASE("BMI270 auxWriteRegister() writes the correct register and value") {
+//     clear_spi_tx_buffer();
 
-    Config config(&mock_gpio);
-    Transport transport(config);
-    BMI270<Transport> imu(transport);
+//     Config config(&mock_gpio);
+//     Transport transport(config);
+//     BMI270<Transport> imu(transport);
 
-    BMI270_REGISTERS reg = BMI270_REGISTERS::ACC_CONF;
-    uint8_t value = 0x0A;
+//     BMI270_REGISTERS reg = BMI270_REGISTERS::ACC_CONF;
+//     uint8_t value = 0x0A;
 
-    imu.auxWriteRegister(reg, value);
+//     imu.auxWriteRegister(reg, value);
 
-    // Verify that the correct SPI transaction occurred
-    const auto& transactions = get_spi_tx_buffer();
-    REQUIRE(get_spi_tx_buffer_count() == 2); // Expect 2 bytes in the transaction
-    CHECK(transactions[0] == static_cast<uint8_t>(reg));
-    CHECK(transactions[1] == value);
-}
+//     // Verify that the correct SPI transaction occurred
+//     const auto& transactions = get_spi_tx_buffer();
+//     REQUIRE(get_spi_tx_buffer_count() == 2); // Expect 2 bytes in the transaction
+//     CHECK(transactions[0] == static_cast<uint8_t>(reg));
+//     CHECK(transactions[1] == value);
+// }
 
-TEST_CASE("BMI270 transport() returns the correct transport instance")
-{
-    Config config(&mock_gpio);
-    Transport transport(config);
-    BMI270<Transport> imu(transport);
+// TEST_CASE("BMI270 transport() returns the correct transport instance")
+// {
+//     Config config(&mock_gpio);
+//     Transport transport(config);
+//     BMI270<Transport> imu(transport);
 
-    const Transport& returned_transport = imu.transport();
-    // This checks that the returned transport object refers to the same memory location
-    // as the original transport object. If they are the same, it confirms that the
-    // transport() method correctly returns a reference to the internal transport object.
-    CHECK(&returned_transport == &transport);
-}
+//     const Transport& returned_transport = imu.transport();
+//     // This checks that the returned transport object refers to the same memory location
+//     // as the original transport object. If they are the same, it confirms that the
+//     // transport() method correctly returns a reference to the internal transport object.
+//     CHECK(&returned_transport == &transport);
+// }

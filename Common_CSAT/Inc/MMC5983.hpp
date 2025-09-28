@@ -40,7 +40,7 @@ struct MagnetometerCalibration
 
 constexpr MagnetometerCalibration DefaultMMC5983Calibration = {
     {au::make_quantity<au::TeslaInBodyFrame>(0.0f), au::make_quantity<au::TeslaInBodyFrame>(0.0f), au::make_quantity<au::TeslaInBodyFrame>(0.0f)},
-    {{{1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 0.0f}}}};
+    {{{1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}}}};
 
 class MMC5983Core
 {
@@ -105,9 +105,10 @@ public:
 
     bool performSet() const { return writeRegister(MMC5983_REGISTERS::MMC5983_CONTROL0, 0x08); }
 
-private:
+public:
     bool writeRegister(MMC5983_REGISTERS reg, uint8_t value) const;
     bool readRegister(MMC5983_REGISTERS reg, uint8_t &value) const;
+    bool readRegisters(MMC5983_REGISTERS reg, uint8_t *rx_buf, uint16_t rx_len) const;
 
 private:
     const Transport &transport_;
@@ -125,14 +126,22 @@ bool MMC5983<Transport>::writeRegister(MMC5983_REGISTERS reg, uint8_t value) con
 
 template <typename Transport>
     requires RegisterModeTransport<Transport>
+bool MMC5983<Transport>::readRegisters(MMC5983_REGISTERS reg, uint8_t *rx_buf, uint16_t rx_len) const
+{
+    uint8_t tx_buf[1] = {static_cast<uint8_t>(reg) | MMC5983_READ_BIT};
+    return transport_.write_then_read(tx_buf, sizeof(tx_buf), rx_buf, rx_len);
+}
+
+template <typename Transport>
+    requires RegisterModeTransport<Transport>
 bool MMC5983<Transport>::readRegister(MMC5983_REGISTERS reg, uint8_t &value) const
 {
     uint8_t tx_buf[1] = {static_cast<uint8_t>(reg) | MMC5983_READ_BIT};
-    uint8_t rx_buf[2]{};
+    uint8_t rx_buf[1]{};
     bool ok = transport_.write_then_read(tx_buf, sizeof(tx_buf), rx_buf, sizeof(rx_buf));
     if (!ok)
         return false;
-    value = rx_buf[1];
+    value = rx_buf[0];
     return true;
 }
 

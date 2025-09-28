@@ -47,7 +47,7 @@ TEST_CASE("BMI270AuxTransport write_then_read shifts dummy byte")
     clear_spi_rx_buffer();
 
     // Inject dummy + 3 magnetometer bytes
-    uint8_t raw[] = {0x00, 0x11, 0x22, 0x33}; // dummy + X_LSB, X_MSB, Y_LSB
+    uint8_t raw[] = {0xff, 0x00, 0x11, 0x22, 0x33}; // dummy + X_LSB, X_MSB, Y_LSB
     inject_spi_rx_data(raw, sizeof(raw));
 
     Config config(&mock_gpio);
@@ -56,8 +56,9 @@ TEST_CASE("BMI270AuxTransport write_then_read shifts dummy byte")
     BMI270AuxTransport<BMI270<Transport>> aux(bmi);
 
     uint8_t tx[] = {static_cast<uint8_t>(MMC5983_REGISTERS::MMC5983_XOUT0)};
-    uint8_t rx[4] = {};
-    CHECK(aux.write_then_read(tx, 1, rx, sizeof(rx)) == true);
+    uint8_t rx[3] = {};
+    auto ok = aux.write_then_read(tx, 1, rx, sizeof(rx));
+    CHECK(ok == true);
 
     // Check shifted result
     CHECK(rx[0] == 0x11);
@@ -70,7 +71,7 @@ TEST_CASE("BMI270_MMC5983 readRawMagnetometer returns expected values")
     clear_spi_rx_buffer();
 
 uint8_t raw[] = {
-    0x00,       // dummy
+    0xff, 0xff, // dummy    
     0x02, 0x01, // X MSB, ISB
     0x05, 0x04, // Y MSB, ISB
     0x08, 0x07, // Z MSB, ISB
@@ -85,7 +86,7 @@ uint8_t raw[] = {
     IMUCombo imu(transport);
 
     auto result = imu.readRawMagnetometer();
-    CHECK(result.at(0) == MMC5983Core::toInt32((raw[7] >> 6) & 0b11, raw[2], raw[1]));
-    CHECK(result.at(1) == MMC5983Core::toInt32((raw[7] >> 4) & 0b11, raw[4], raw[3]));
-    CHECK(result.at(2) == MMC5983Core::toInt32((raw[7] >> 2) & 0b11, raw[6], raw[5]));
+    CHECK(result.at(0) == MMC5983Core::toInt32((raw[8] >> 6) & 0b11, raw[3], raw[2]));
+    CHECK(result.at(1) == MMC5983Core::toInt32((raw[8] >> 4) & 0b11, raw[5], raw[4]));
+    CHECK(result.at(2) == MMC5983Core::toInt32((raw[8] >> 2) & 0b11, raw[7], raw[6]));
 }
