@@ -45,7 +45,7 @@ template <typename BMITransport>
 bool BMI270AuxTransport<BMITransport>::write_then_read(const uint8_t* tx_buf, uint16_t tx_len, uint8_t* rx_buf, uint16_t rx_len) const {
     if (tx_len != 1 || rx_len < 2 || rx_len > 8) return false;
 
-    uint8_t data_buf[2] = { static_cast<uint8_t>(BMI270_REGISTERS::AUX_WR_DATA), tx_buf[0] };
+    uint8_t data_buf[2] = { static_cast<uint8_t>(BMI270_REGISTERS::AUX_RD_ADDR), tx_buf[0] };
     uint8_t addr_buf[1] = { static_cast<uint8_t>(BMI270_REGISTERS::AUX_DATA_X_LSB) | BMI270_READ_BIT };
     uint8_t buf[10]{}; 
 
@@ -55,10 +55,11 @@ bool BMI270AuxTransport<BMITransport>::write_then_read(const uint8_t* tx_buf, ui
     // Wait for BMI270 to fetch from AUX device
     HAL_Delay(1); // or use a smarter wait if you have AUX status polling
 
-    if (!bmi_.getTransport().write_then_read(addr_buf, sizeof(addr_buf), buf, rx_len+2)) return false;
+    if (!bmi_.getTransport().write_then_read(addr_buf, sizeof(addr_buf), buf, rx_len+1)) return false;
 
     // Shift buffer left to remove dummy
-    memcpy(rx_buf, buf + 2, rx_len);
+    memcpy(rx_buf, buf + 1, rx_len);
+
     return true;
 }
 
@@ -80,12 +81,7 @@ public:
 
     bool configure() const;
     std::optional<MagneticFieldInBodyFrame> readMagnetometer() const { return mag_.readMagnetometer(); }
-    std::array<int32_t, 3> readRawMagnetometer() const { return mag_.readRawMagnetometer(); }
-    // std::array<int32_t, 3> readRawMagnetometer() const;
-
-    bool auxWriteRegister(MMC5983_REGISTERS reg, uint8_t value) const;
-	bool auxReadRegister(MMC5983_REGISTERS reg, uint8_t &value) const;
-	bool auxReadRegisters(MMC5983_REGISTERS reg, uint8_t *rx_buf, uint16_t rx_len) const;
+    std::array<int32_t, 3> readRawMagnetometer() const;
 
 private:
     bool configureContinuousMode(uint8_t freq_code, uint8_t set_interval_code, bool auto_set) const;
@@ -133,33 +129,106 @@ bool BMI270_MMC5983<Transport>::configure() const
 
 	configureContinuousMode(/*freq_code=*/0b101, /*set_interval_code=*/0b011, /*auto_set=*/true);
 
-	BMI270<Transport>::writeRegister(BMI270_REGISTERS::AUX_RD_ADDR, 0x00);
+//
+//	manual mode
+//
+
+	BMI270<Transport>::writeRegister(BMI270_REGISTERS::AUX_IF_CONF, 0b10001100);
 	BMI270<Transport>::writeRegister(BMI270_REGISTERS::IF_CONF, 0b00100000);
-	BMI270<Transport>::writeRegister(BMI270_REGISTERS::AUX_IF_CONF, 0x03);
-	BMI270<Transport>::writeRegister(BMI270_REGISTERS::PWR_CTRL, 0b00001111);
+
+//
+//	automatic mode
+//
+
+
+//	BMI270<Transport>::writeRegister(BMI270_REGISTERS::AUX_RD_ADDR, 0x00);
+//	BMI270<Transport>::writeRegister(BMI270_REGISTERS::IF_CONF, 0b00100000);
+//	BMI270<Transport>::writeRegister(BMI270_REGISTERS::AUX_IF_CONF, 0b0001111);
+//	BMI270<Transport>::writeRegister(BMI270_REGISTERS::PWR_CTRL, 0b00001111);
 
 	return true;
 }
+
+//
+// automatic mode
+//
+
+// template <typename Transport>
+//     requires RegisterModeTransport<Transport>
+// std::optional<MagneticFieldInBodyFrame> readMagnetometer() const { return mag_.readMagnetometer(); }
+// {
+// 	uint8_t tx_buf = static_cast<uint8_t>(BMI270_REGISTERS::AUX_DATA_X_LSB) | BMI270<Transport>::BMI270_READ_BIT;
+//    uint8_t rx_buf[9]{};
+//
+//     if (!BMI270<Transport>::getTransport().write_then_read(&tx_buf, 1, rx_buf, sizeof(rx_buf)))
+//     {
+//         memset(rx_buf, 0, sizeof(rx_buf));
+//     }
+//
+//auto uncalibrated = MMC5983Core::parseMagnetometerData(rx_buf+1);
+//uncalibrated[0] -= calibration_.bias[0];
+//uncalibrated[1] -= calibration_.bias[1];
+//uncalibrated[2] -= calibration_.bias[2];
+//
+//return MagneticFieldInBodyFrame{
+//    uncalibrated[0] * calibration_.scale[0][0] + uncalibrated[1] * calibration_.scale[0][1] + uncalibrated[2] * calibration_.scale[0][2],
+//    uncalibrated[0] * calibration_.scale[1][0] + uncalibrated[1] * calibration_.scale[1][1] + uncalibrated[2] * calibration_.scale[1][2],
+//    uncalibrated[0] * calibration_.scale[2][0] + uncalibrated[1] * calibration_.scale[2][1] + uncalibrated[2] * calibration_.scale[2][2]};
+// }
+
 
 // template <typename Transport>
 //     requires RegisterModeTransport<Transport>
 // std::array<int32_t, 3> BMI270_MMC5983<Transport>::readRawMagnetometer() const
 // {
-// 	BMI270<Transport>::writeRegister(BMI270_REGISTERS::AUX_RD_ADDR, 0x00);
-// 	HAL_Delay(1);
-
 // 	uint8_t tx_buf = static_cast<uint8_t>(BMI270_REGISTERS::AUX_DATA_X_LSB) | BMI270<Transport>::BMI270_READ_BIT;
-//     uint8_t rx_buf[9]{};
-
+//    uint8_t rx_buf[9]{};
+//
 //     if (!BMI270<Transport>::getTransport().write_then_read(&tx_buf, 1, rx_buf, sizeof(rx_buf)))
 //     {
 //         memset(rx_buf, 0, sizeof(rx_buf));
 //     }
-
-//     log(LOG_LEVEL_DEBUG, "AUX: %2x %2x %2x %2x %2x %2x %2x %2x \r\n",
-//     		rx_buf[1], rx_buf[2], rx_buf[3], rx_buf[4], rx_buf[5], rx_buf[6], rx_buf[7], rx_buf[8]);
-
-//     return MMC5983Core::parseRawMagnetometerData(rx_buf+1);
+//
+//     auto results = MMC5983Core::parseRawMagnetometerData(rx_buf+1);
+//     log(LOG_LEVEL_DEBUG, "AUX: %2x %2x %2x %2x %2x %2x %2x %2x: %ld %ld %ld \r\n",
+//     		rx_buf[1], rx_buf[2], rx_buf[3], rx_buf[4], rx_buf[5], rx_buf[6], rx_buf[7], rx_buf[8],
+//			results[0], results[1], results[2]);
+//     return results;
 // }
+
+//
+// manual modes
+//
+
+// template <typename Transport>
+//     requires RegisterModeTransport<Transport>
+// std::optional<MagneticFieldInBodyFrame> readMagnetometer() const { return mag_.readMagnetometer(); }
+
+// template <typename Transport>
+//     requires RegisterModeTransport<Transport>
+// std::array<int32_t, 3> readRawMagnetometer() const { return mag_.readRawMagnetometer(); }
+
+// template <typename Transport>
+//     requires RegisterModeTransport<Transport>
+// std::array<int32_t, 3> BMI270_MMC5983<Transport>::readRawMagnetometer() const
+// {
+//	BMI270<Transport>::writeRegister(BMI270_REGISTERS::AUX_RD_ADDR, 0x00);
+//	HAL_Delay(3);
+//
+//	uint8_t tx_buf = static_cast<uint8_t>(BMI270_REGISTERS::AUX_DATA_X_LSB) | BMI270<Transport>::BMI270_READ_BIT;
+//    uint8_t rx_buf[9]{};
+//
+//     if (!BMI270<Transport>::getTransport().write_then_read(&tx_buf, 1, rx_buf, sizeof(rx_buf)))
+//     {
+//         memset(rx_buf, 0, sizeof(rx_buf));
+//     }
+//
+//     auto results = MMC5983Core::parseRawMagnetometerData(rx_buf+1);
+//     log(LOG_LEVEL_DEBUG, "AUX: %2x %2x %2x %2x %2x %2x %2x %2x: %ld %ld %ld \r\n",
+//     		rx_buf[1], rx_buf[2], rx_buf[3], rx_buf[4], rx_buf[5], rx_buf[6], rx_buf[7], rx_buf[8],
+//			results[0], results[1], results[2]);
+//     return results;
+// }
+
 
 #endif /* _BMI270_MMC9583H_ */
