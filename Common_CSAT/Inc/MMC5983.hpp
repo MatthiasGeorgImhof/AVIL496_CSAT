@@ -7,6 +7,7 @@
 #include "au.hpp"
 #include "IMU.hpp"
 #include "Transport.hpp"
+#include "Logger.hpp"
 
 #ifdef __x86_64__
 #include "mock_hal.h"
@@ -81,6 +82,19 @@ public:
             toInt32((buf[6] >> 6) & 0b11, buf[1], buf[0]),
             toInt32((buf[6] >> 4) & 0b11, buf[3], buf[2]),
             toInt32((buf[6] >> 2) & 0b11, buf[5], buf[4])};
+    }
+
+    static MagneticFieldInBodyFrame calibrateMagnetometer(const uint8_t *rx_buf, const MagnetometerCalibration &calibration)
+    {
+        auto uncalibrated = MMC5983Core::parseMagnetometerData(rx_buf);
+        uncalibrated[0] -= calibration.bias[0];
+        uncalibrated[1] -= calibration.bias[1];
+        uncalibrated[2] -= calibration.bias[2];
+
+        return MagneticFieldInBodyFrame{
+            uncalibrated[0] * calibration.scale[0][0] + uncalibrated[1] * calibration.scale[0][1] + uncalibrated[2] * calibration.scale[0][2],
+            uncalibrated[0] * calibration.scale[1][0] + uncalibrated[1] * calibration.scale[1][1] + uncalibrated[2] * calibration.scale[1][2],
+            uncalibrated[0] * calibration.scale[2][0] + uncalibrated[1] * calibration.scale[2][1] + uncalibrated[2] * calibration.scale[2][2]};
     }
 };
 
@@ -198,15 +212,7 @@ std::optional<MagneticFieldInBodyFrame> MMC5983<Transport>::readMagnetometer() c
         return std::nullopt;
     }
 
-    auto uncalibrated = MMC5983Core::parseMagnetometerData(rx_buf);
-    uncalibrated[0] -= calibration_.bias[0];
-    uncalibrated[1] -= calibration_.bias[1];
-    uncalibrated[2] -= calibration_.bias[2];
-
-    return MagneticFieldInBodyFrame{
-        uncalibrated[0] * calibration_.scale[0][0] + uncalibrated[1] * calibration_.scale[0][1] + uncalibrated[2] * calibration_.scale[0][2],
-        uncalibrated[0] * calibration_.scale[1][0] + uncalibrated[1] * calibration_.scale[1][1] + uncalibrated[2] * calibration_.scale[1][2],
-        uncalibrated[0] * calibration_.scale[2][0] + uncalibrated[1] * calibration_.scale[2][1] + uncalibrated[2] * calibration_.scale[2][2]};
+    return MMC5983Core::calibrateMagnetometer(rx_buf, calibration_);
 }
 
 template <typename Transport>
@@ -238,8 +244,8 @@ std::array<int32_t, 3> MMC5983<Transport>::readRawMagnetometer() const
 
     auto results = MMC5983Core::parseRawMagnetometerData(rx_buf);
     log(LOG_LEVEL_DEBUG, "SPI: %2x %2x %2x %2x %2x %2x %2x %2x: %ld %ld %ld \r\n",
-    		rx_buf[0], rx_buf[1], rx_buf[2], rx_buf[3], rx_buf[4], rx_buf[5], rx_buf[6], rx_buf[7],
-			results[0], results[1], results[2]);
+        rx_buf[0], rx_buf[1], rx_buf[2], rx_buf[3], rx_buf[4], rx_buf[5], rx_buf[6], rx_buf[7],
+        results[0], results[1], results[2]);
     return results;
 }
 
