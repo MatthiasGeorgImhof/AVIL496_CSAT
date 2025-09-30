@@ -173,7 +173,7 @@ std::optional<MagneticFieldInBodyFrame> BMI270_MMC5983<Transport>::readMagnetome
         memset(rx_buf, 0, sizeof(rx_buf));
     }
 
-    return MMC5983Core::calibrateMagnetometer(rx_buf + 1, mag_.getCalibration());
+    return MMC5983Core::convertMag(MMC5983Core::calibrateMagnetometer(rx_buf+1, mag_.calibration()));
 }
 
 template <typename Transport>
@@ -188,11 +188,10 @@ std::array<int32_t, 3> BMI270_MMC5983<Transport>::readRawMagnetometer() const
         memset(rx_buf, 0, sizeof(rx_buf));
     }
 
-    auto results = MMC5983Core::parseRawMagnetometerData(rx_buf + 1);
-    log(LOG_LEVEL_DEBUG, "AUX: %2x %2x %2x %2x %2x %2x %2x %2x: %ld %ld %ld \r\n",
-        rx_buf[1], rx_buf[2], rx_buf[3], rx_buf[4], rx_buf[5], rx_buf[6], rx_buf[7], rx_buf[8],
-        results[0], results[1], results[2]);
-    return results;
+    return MMC5983Core::parseMagnetometerData(rx_buf + 1);
+//    log(LOG_LEVEL_DEBUG, "AUX: %2x %2x %2x %2x %2x %2x %2x %2x: %ld %ld %ld \r\n",
+//        rx_buf[1], rx_buf[2], rx_buf[3], rx_buf[4], rx_buf[5], rx_buf[6], rx_buf[7], rx_buf[8],
+//        results[0], results[1], results[2]);
 }
 
 //

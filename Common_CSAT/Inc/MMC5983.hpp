@@ -35,12 +35,12 @@ enum class MMC5983_REGISTERS : uint8_t
 
 struct MagnetometerCalibration
 {
-    MagneticFieldInBodyFrame bias;
+    std::array<float, 3> bias;
     std::array<std::array<float, 3>, 3> scale;
 };
 
 constexpr MagnetometerCalibration DefaultMMC5983Calibration = {
-    {au::make_quantity<au::TeslaInBodyFrame>(0.0f), au::make_quantity<au::TeslaInBodyFrame>(0.0f), au::make_quantity<au::TeslaInBodyFrame>(0.0f)},
+    {0.0f, 0.0f, 0.0f},
     {{{1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}}}};
 
 class MMC5983Core
@@ -53,12 +53,15 @@ public:
         return ((msb << 10) | (isb << 2) | lsb) - NULL_VALUE;
     }
 
-    static au::QuantityF<au::TeslaInBodyFrame> convertMag(uint8_t lsb, uint8_t isb, uint8_t msb)
+    static MagneticFieldInBodyFrame convertMag(const std::array<float,3> mag)
     {
         constexpr float COUNT_PER_GAUSS = 16384.f;
         constexpr float GAUSS_PER_TESLA = 10000.f;
         constexpr float TESLA_PER_COUNT = 1.f / (COUNT_PER_GAUSS * GAUSS_PER_TESLA);
-        return au::make_quantity<au::TeslaInBodyFrame>(static_cast<float>(toInt32(lsb, isb, msb)) * TESLA_PER_COUNT);
+        return { au::make_quantity<au::TeslaInBodyFrame>(mag[0] * TESLA_PER_COUNT),
+		au::make_quantity<au::TeslaInBodyFrame>(mag[1] * TESLA_PER_COUNT),
+		au::make_quantity<au::TeslaInBodyFrame>(mag[2] * TESLA_PER_COUNT)
+        };
     }
 
     static au::QuantityF<au::Celsius> convertTmp(const uint8_t value)
@@ -68,15 +71,7 @@ public:
         return au::make_quantity<au::Celsius>(TMP_SHIFT + value * LSB_PER_TMP);
     }
 
-    static MagneticFieldInBodyFrame parseMagnetometerData(const uint8_t *buf)
-    {
-        return MagneticFieldInBodyFrame{
-            convertMag((buf[6] >> 6) & 0b11, buf[1], buf[0]),
-            convertMag((buf[6] >> 4) & 0b11, buf[3], buf[2]),
-            convertMag((buf[6] >> 2) & 0b11, buf[5], buf[4])};
-    }
-
-    static std::array<int32_t, 3> parseRawMagnetometerData(const uint8_t *buf)
+    static std::array<int32_t, 3> parseMagnetometerData(const uint8_t *buf)
     {
         return {
             toInt32((buf[6] >> 6) & 0b11, buf[1], buf[0]),
@@ -84,14 +79,16 @@ public:
             toInt32((buf[6] >> 2) & 0b11, buf[5], buf[4])};
     }
 
-    static MagneticFieldInBodyFrame calibrateMagnetometer(const uint8_t *rx_buf, const MagnetometerCalibration &calibration)
+    static std::array<float, 3> calibrateMagnetometer(const uint8_t *rx_buf, const MagnetometerCalibration &calibration)
     {
-        auto uncalibrated = MMC5983Core::parseMagnetometerData(rx_buf);
-        uncalibrated[0] -= calibration.bias[0];
-        uncalibrated[1] -= calibration.bias[1];
-        uncalibrated[2] -= calibration.bias[2];
+        auto parsed = MMC5983Core::parseMagnetometerData(rx_buf);
+        const std::array<float, 3> uncalibrated {
+        		static_cast<float>(parsed[0]) - calibration.bias[0],
+        		static_cast<float>(parsed[1]) - calibration.bias[1],
+        		static_cast<float>(parsed[2]) - calibration.bias[2]
+        };
 
-        return MagneticFieldInBodyFrame{
+        return {
             uncalibrated[0] * calibration.scale[0][0] + uncalibrated[1] * calibration.scale[0][1] + uncalibrated[2] * calibration.scale[0][2],
             uncalibrated[0] * calibration.scale[1][0] + uncalibrated[1] * calibration.scale[1][1] + uncalibrated[2] * calibration.scale[1][2],
             uncalibrated[0] * calibration.scale[2][0] + uncalibrated[1] * calibration.scale[2][1] + uncalibrated[2] * calibration.scale[2][2]};
@@ -118,6 +115,7 @@ public:
     uint8_t readRawThermometer() const;
 
     bool performSet() const { return writeRegister(MMC5983_REGISTERS::MMC5983_CONTROL0, 0x08); }
+    const MagnetometerCalibration &calibration() const { return calibration_; }
 
 public:
     bool writeRegister(MMC5983_REGISTERS reg, uint8_t value) const;
@@ -212,7 +210,7 @@ std::optional<MagneticFieldInBodyFrame> MMC5983<Transport>::readMagnetometer() c
         return std::nullopt;
     }
 
-    return MMC5983Core::calibrateMagnetometer(rx_buf, calibration_);
+    return MMC5983Core::convertMag(MMC5983Core::calibrateMagnetometer(rx_buf, calibration_));
 }
 
 template <typename Transport>
@@ -242,11 +240,10 @@ std::array<int32_t, 3> MMC5983<Transport>::readRawMagnetometer() const
         memset(rx_buf, 0, sizeof(rx_buf));
     }
 
-    auto results = MMC5983Core::parseRawMagnetometerData(rx_buf);
-    log(LOG_LEVEL_DEBUG, "SPI: %2x %2x %2x %2x %2x %2x %2x %2x: %ld %ld %ld \r\n",
-        rx_buf[0], rx_buf[1], rx_buf[2], rx_buf[3], rx_buf[4], rx_buf[5], rx_buf[6], rx_buf[7],
-        results[0], results[1], results[2]);
-    return results;
+    return MMC5983Core::parseMagnetometerData(rx_buf);
+//    log(LOG_LEVEL_DEBUG, "SPI: %2x %2x %2x %2x %2x %2x %2x %2x: %ld %ld %ld \r\n",
+//        rx_buf[0], rx_buf[1], rx_buf[2], rx_buf[3], rx_buf[4], rx_buf[5], rx_buf[6], rx_buf[7],
+//        results[0], results[1], results[2]);
 }
 
 template <typename Transport>

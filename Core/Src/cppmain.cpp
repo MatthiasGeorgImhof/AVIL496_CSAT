@@ -211,11 +211,11 @@ void cppmain()
 	PowerMonitor<MonitorTransport> power_monitor(monitor_transport);
 
 	constexpr MagnetometerCalibration aux_mmc_calibration = {
-	    { au::make_quantity<au::TeslaInBodyFrame>(2.05216351e-05f), au::make_quantity<au::TeslaInBodyFrame>(1.88477490e-05f), au::make_quantity<au::TeslaInBodyFrame>(2.57038804e-07f) },
+	    { 3.19048657e+03f,  3.21802648e+03f, -1.86857329e+01f, },
 	    {{
-	        { 0.89675333f,  0.0026198f,  -0.00259815f },
-	        { 0.0026198f,   0.91909188f,  0.003695f    },
-	        { -0.00259815f, 0.003695f,    0.87256288f  }
+	        { 1.0f,	0.0f, 0.0f },
+	        { 0.0f, 1.0f, 0.0f },
+	        { 0.0f, 0.0f, 1.0f }
 	    }}
 	};
 	using IMUConfigType = SPI_Config<hspi2, GPIO_SPI2_GYRO_CS_Pin, 128>;
@@ -230,12 +230,12 @@ void cppmain()
 
 
 	constexpr MagnetometerCalibration spi_mmc_calibration = {
-		{ au::make_quantity<au::TeslaInBodyFrame>(-1.28120647e-06f), au::make_quantity<au::TeslaInBodyFrame>(1.11679164e-05f), au::make_quantity<au::TeslaInBodyFrame>(5.11724020e-06f) },
-		{{
-				{ 0.99498789f, 0.01241906f, 0.00664294f, },
-				 { 0.01241906f, 1.00374665f, 0.00229451f,},
-				 { 0.00664294f, 0.00229451f, 0.95963044f}
-		}}
+    { -4.78483917e+02f,  2.32297897e+03f,  6.76868257e+02f, },
+    {{
+	        { 1.0f,	0.0f, 0.0f },
+	        { 0.0f, 1.0f, 0.0f },
+	        { 0.0f, 0.0f, 1.0f }
+    }}
 	};
 	using MagConfigType = SPI_Config<hspi1, GPIO_SPI1_MAG_CS_Pin, 128>;
 	MagConfigType mag_config(GPIOE);
@@ -295,11 +295,12 @@ void cppmain()
 				mag_mag.value()[0].in(au::nano(au::teslaInBodyFrame)), mag_mag.value()[1].in(au::nano(au::teslaInBodyFrame)), mag_mag.value()[2].in(au::nano(au::teslaInBodyFrame)));
 
 //		HAL_Delay(250);
-//		auto mag_chip = mag.readChipID();
-//		auto mag_tmp = mag.readRawThermometer();
-//		auto mag_mag = mag.readRawMagnetometer();
-//		sprintf(buffer, "SPI MAG %d: (%d) (%ld %ld %ld)\r\n",
-//				mag_chip.value(), mag_tmp, mag_mag[0], mag_mag[1], mag_mag[2]);
+//		auto aux_mag = imu.readRawMagnetometer();
+//		auto spi_mag = mag.readRawMagnetometer();
+//		(void) aux_mag;
+//		(void) spi_mag;
+//		sprintf(buffer, "MAGs %ld %ld %ld %ld %ld %ld \r\n",
+//				aux_mag[0], aux_mag[1], aux_mag[2], spi_mag[0], spi_mag[1], spi_mag[2]);
 
 
 //	    auto imu_id = imu.readChipID();
