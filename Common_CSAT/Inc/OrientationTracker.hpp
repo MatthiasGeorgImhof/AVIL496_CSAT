@@ -151,8 +151,10 @@ public:
     {
     }
 
-    void updateMagnetometer(const Eigen::Vector3f &imu_meas_body, au::QuantityU64<au::Milli<au::Seconds>> timestamp)
+    void updateMagnetometer(const Eigen::Vector3f &mag_body, au::QuantityU64<au::Milli<au::Seconds>> timestamp)
     {
+        Eigen::Vector3f norm_mag_body{mag_body};
+        norm_mag_body.normalize();
         BaseOrientationTracker<StateSize, MeasurementSize>::predictTo(timestamp);
 
         auto h = [&](const StateVector &x)
@@ -181,7 +183,7 @@ public:
         H_jac(2, 2) = 2.0f * (my * qz + mz * qy); // Corre
         H_jac(2, 3) = -2.0f * (mx * qx + my * qy);
 
-        BaseOrientationTracker<StateSize, MeasurementSize>::ekf.updateEKF(h, H_jac, imu_meas_body);
+        BaseOrientationTracker<StateSize, MeasurementSize>::ekf.updateEKF(h, H_jac, norm_mag_body);
 
         Eigen::Quaternionf q_corr(x(3), x(0), x(1), x(2));
         q_corr.normalize();
@@ -227,6 +229,8 @@ public:
                                          const Eigen::Vector3f &mag_body,
                                          au::QuantityU64<au::Milli<au::Seconds>> timestamp)
     {
+        Eigen::Vector3f norm_mag_body{mag_body};
+        norm_mag_body.normalize();
         BaseOrientationTracker<StateSize, MeasurementSize>::predictTo(timestamp);
 
         Eigen::Vector3f accel_ned(0.f, 0.f, 9.81f); // Gravity points down
@@ -235,7 +239,7 @@ public:
         // Combined measurement vector
         Measurement combined_meas;
         combined_meas.template segment<3>(0) = accel_body;
-        combined_meas.template segment<3>(3) = mag_body;
+        combined_meas.template segment<3>(3) = norm_mag_body;
 
         auto h = [&](const StateVector &x)
         {
@@ -416,14 +420,14 @@ void AccGyrMagOrientation<Tracker, IMU, MAG>::update(au::QuantityU64<au::Milli<a
 {
     if (imu_counter_ % imu_rate_ == 0)
     {
-        auto optional_angular = imu_.getGyroscope();
+        auto optional_angular = imu_.readGyroscope();
         if (optional_angular.has_value())
         {
             auto angular = optional_angular.value();
             tracker_.updateGyro(Eigen::Vector3f(angular.x.in(au::radiansPerSecondInBodyFrame), angular.y.in(au::radiansPerSecondInBodyFrame), angular.z.in(au::radiansPerSecondInBodyFrame)), timestamp);
 
-            auto optional_accel = imu_.getAccelerometer();
-            auto optional_magnetic = imu_.getMagnetometer();
+            auto optional_accel = imu_.readAccelerometer();
+            auto optional_magnetic = imu_.readMagnetometer();
 
             if (optional_accel.has_value() && optional_magnetic.has_value())
             {
