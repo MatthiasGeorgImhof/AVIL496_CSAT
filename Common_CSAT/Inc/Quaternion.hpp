@@ -10,4 +10,6 @@ Eigen::Matrix<float, 3, 4> computeAnalyticalJacobian(const Eigen::Quaternionf &q
 
 Eigen::Matrix<float, 3, 4> normalizeAnalyticalJacobian(const Eigen::Matrix<float, 3, 4>& J_analytical, const Eigen::Quaternionf& q, const Eigen::Vector3f& v);
 
+Eigen::Vector3f getYawPitchRoll(const Eigen::Quaternionf &q);
+
 #endif // __QUATERION_HPP__
