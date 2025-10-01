@@ -424,7 +424,7 @@ void AccGyrMagOrientation<Tracker, IMU, MAG>::update(au::QuantityU64<au::Milli<a
         if (optional_angular.has_value())
         {
             auto angular = optional_angular.value();
-            tracker_.updateGyro(Eigen::Vector3f(angular.x.in(au::radiansPerSecondInBodyFrame), angular.y.in(au::radiansPerSecondInBodyFrame), angular.z.in(au::radiansPerSecondInBodyFrame)), timestamp);
+            tracker_.updateGyro(Eigen::Vector3f(angular[0].in(au::radiansPerSecondInBodyFrame), angular[1].in(au::radiansPerSecondInBodyFrame), angular[2].in(au::radiansPerSecondInBodyFrame)), timestamp);
 
             auto optional_accel = imu_.readAccelerometer();
             auto optional_magnetic = imu_.readMagnetometer();
@@ -434,10 +434,10 @@ void AccGyrMagOrientation<Tracker, IMU, MAG>::update(au::QuantityU64<au::Milli<a
                 auto accel = optional_accel.value();
                 auto magnetic = optional_magnetic.value();
 
-                Eigen::Vector3f accel_body(accel.x.in(au::bodys * au::meters / (au::seconds * au::seconds)),
-                                           accel.y.in(au::bodys * au::meters / (au::seconds * au::seconds)),
-                                           accel.z.in(au::bodys * au::meters / (au::seconds * au::seconds)));
-                Eigen::Vector3f mag_body(magnetic.x.in(au::bodys * au::tesla), magnetic.y.in(au::bodys * au::tesla), magnetic.z.in(au::bodys * au::tesla));
+                Eigen::Vector3f accel_body(accel[0].in(au::bodys * au::meters / (au::seconds * au::seconds)),
+                                           accel[1].in(au::bodys * au::meters / (au::seconds * au::seconds)),
+                                           accel[2].in(au::bodys * au::meters / (au::seconds * au::seconds)));
+                Eigen::Vector3f mag_body(magnetic[0].in(au::bodys * au::tesla), magnetic[1].in(au::bodys * au::tesla), magnetic[2].in(au::bodys * au::tesla));
 
                 tracker_.updateAccelerometerMagnetometer(accel_body, mag_body, timestamp);
             }
