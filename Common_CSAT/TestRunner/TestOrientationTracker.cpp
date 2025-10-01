@@ -1,7 +1,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest/doctest.h"
 
-#include "OrientationTracker.hpp"
+#include "OrientationService.hpp"
 #include <Eigen/Dense>
 #include <iostream>
 #include <cmath>
@@ -36,7 +36,7 @@ TEST_CASE("predictTo integrates quaternion forward using gyro state")
 TEST_CASE("updateMagnetometer reduces yaw error after prediction")
 {
     GyrMagOrientationTracker tracker;
-    tracker.setMagneticReference(0.3f, 0.5f, 0.8f);
+    tracker.setReferenceVectors(Eigen::Vector3f(0.3f, 0.5f, 0.8f));
 
 
     Eigen::Vector3f omega(0, 0, m_mpif / 180.0f * 45.0f); // 45 deg/s
@@ -71,7 +71,7 @@ TEST_CASE("updateMagnetometer reduces yaw error after prediction")
 TEST_CASE("GyrMagOrientationTracker follows yaw rotation with magnetometer corrections")
 {
     GyrMagOrientationTracker tracker;
-    tracker.setMagneticReference(0.3f, 0.5f, 0.8f);
+    tracker.setReferenceVectors(Eigen::Vector3f(0.3f, 0.5f, 0.8f));
 
 
     float dt = 0.5f;
@@ -145,7 +145,7 @@ TEST_CASE("predictTo integrates quaternion forward using gyro state")
 TEST_CASE("updateAccelerometerMagnetometer converges yaw orientation within envelope")
 {
     AccGyrMagOrientationTracker tracker;
-    tracker.setMagneticReference(1.0f, 0.0f, 0.0f);
+    tracker.setReferenceVectors(Eigen::Vector3f(0.0f, 0.0f, 9.81f), Eigen::Vector3f(1.0f, 0.0f, 0.0f));
 
     Eigen::Quaternionf q_true(Eigen::AngleAxisf(m_mpif / 4.0f, Eigen::Vector3f::UnitZ()));
     Eigen::Vector3f accel_ned(0.0f, 0.0f, 9.81f);
@@ -203,7 +203,7 @@ TEST_CASE("updateAccelerometerMagnetometer converges yaw orientation within enve
 TEST_CASE("AccGyrMagOrientationTracker follows yaw rotation with accelerometer and magnetometer corrections")
 {
     AccGyrMagOrientationTracker tracker;
-    tracker.setMagneticReference(1.0f, 0.0f, 0.0f);
+    tracker.setReferenceVectors(Eigen::Vector3f(0.0f, 0.0f, 9.81f), Eigen::Vector3f(1.0f, 0.0f, 0.0f));
 
     float dt = 0.5f;
     float yaw_rate = 30.f * m_mpif / 180.f; // 30 deg/s
@@ -256,7 +256,7 @@ TEST_CASE("AccGyrMagOrientationTracker follows yaw rotation with accelerometer a
 TEST_CASE("updateAccelerometerMagnetometer converges yaw orientation within envelope - SIMPLIFIED")
 {
     AccGyrMagOrientationTracker tracker;
-    tracker.setMagneticReference(1.0f, 0.0f, 0.0f);
+    tracker.setReferenceVectors(Eigen::Vector3f(0.0f, 0.0f, 9.81f), Eigen::Vector3f(1.0f, 0.0f, 0.0f));
 
     // Set a known initial yaw error (e.g., start at 0 yaw, target is M_PI/4)
     Eigen::Quaternionf q_initial = Eigen::Quaternionf::Identity(); // Start with yaw = 0
@@ -291,7 +291,7 @@ TEST_CASE("updateAccelerometerMagnetometer converges yaw orientation within enve
 
 TEST_CASE("AccGyrMagOrientationTracker converges roll and pitch orientation") {
     AccGyrMagOrientationTracker tracker;
-    tracker.setMagneticReference(1.0f, 0.0f, 0.0f);
+    tracker.setReferenceVectors(Eigen::Vector3f(0.0f, 0.0f, 9.81f), Eigen::Vector3f(1.0f, 0.0f, 0.0f));
 
     // Set a target orientation with non-zero roll and pitch
     Eigen::Quaternionf q_true(Eigen::AngleAxisf(m_mpif / 6.0f, Eigen::Vector3f::UnitX()) *  // 30 degrees roll
@@ -325,4 +325,29 @@ TEST_CASE("AccGyrMagOrientationTracker converges roll and pitch orientation") {
         REQUIRE(roll_error < 0.5f); // Adjust tolerance as needed
         REQUIRE(pitch_error < 0.5f); // Adjust tolerance as needed
     }
+}
+
+TEST_CASE("AccGyrOrientationTracker initializes with identity quaternion")
+{
+    AccGyrOrientationTracker tracker;
+    auto q = tracker.getOrientation();
+    REQUIRE(q.isApprox(Eigen::Quaternionf::Identity(), 1e-6f));
+}
+
+TEST_CASE("AccGyrOrientationTracker stabilizes pitch and roll from accelerometer")
+{
+    AccGyrOrientationTracker tracker;
+
+    // Simulate tilted orientation: 30° pitch forward
+    Eigen::Quaternionf q_true(Eigen::AngleAxisf(m_mpif / 6.0f, Eigen::Vector3f::UnitY()));
+    Eigen::Vector3f accel_ned(0.f, 0.f, 9.81f);
+    Eigen::Vector3f accel_meas = q_true.conjugate() * accel_ned;
+
+    for (int i = 0; i < 50; ++i)
+    {
+        tracker.updateAccelerometer(accel_meas, au::make_quantity<au::Seconds>(1));
+    }
+
+    Eigen::Vector3f ypr = tracker.getYawPitchRoll();
+    REQUIRE(std::abs(ypr.y() - m_mpif / 6.0f) < 0.05f); // ✅ ~30° pitch
 }

@@ -53,6 +53,7 @@ TEST_FILES = TestArrayList.cpp \
 			 TestMockHal.cpp \
 			 TestO1HeapAllocator.cpp \
 			 TestOrientationTracker.cpp \
+			 TestOrientationService.cpp \
 			 TestPositionTracker9D.cpp \
 			 TestPowerMonitor.cpp \
 			 TestPowerSwitch.cpp \
@@ -677,6 +678,15 @@ $(BIN_DIR)/TestOrientationTracker.o : TestOrientationTracker.cpp
 $(BIN_DIR)/TestOrientationTracker : $(BIN_DIR)/TestOrientationTracker.o $(BIN_DIR)/Quaternion.o
 	@echo "Linking $@"
 	$(CXX) $(LIBS_PATH) -o $@ $(BIN_DIR)/TestOrientationTracker.o $(BIN_DIR)/Quaternion.o $(LIBS)
+
+# Rule for TestOrientationService with with EXTRA_FLAGS only
+$(BIN_DIR)/TestOrientationService.o : TestOrientationService.cpp
+	@echo "Compiling $<"
+	$(CXX)	-c $< $(CXXFLAGS) $(EXTRA_FLAGS) $(INCLUDE_PATHS) -o $@
+
+$(BIN_DIR)/TestOrientationService : $(BIN_DIR)/TestOrientationService.o $(BIN_DIR)/Quaternion.o $(BIN_DIR)/TimeUtils.o $(MOCK_HAL_OBJECTS)
+	@echo "Linking $@"
+	$(CXX) $(LIBS_PATH) -o $@ $(BIN_DIR)/TestOrientationService.o $(BIN_DIR)/Quaternion.o $(BIN_DIR)/TimeUtils.o $(MOCK_HAL_OBJECTS) $(LIBS)
 
 # Rule for TestQuaternion with with EXTRA_FLAGS only
 $(BIN_DIR)/TestQuaternion.o : TestQuaternion.cpp
