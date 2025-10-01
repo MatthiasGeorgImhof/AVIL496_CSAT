@@ -12,6 +12,10 @@ using Config = SPI_Config<mock_spi, GPIO_PIN_5, 128>;
 using Transport = SPITransport<Config>;
 using IMUCombo = BMI270_MMC5983<Transport>;
 
+static_assert(HasBodyGyroscope<IMUCombo>, "IMUType does not satisfy HasBodyGyroscope");
+static_assert(HasBodyAccelerometer<IMUCombo>, "IMUType does not satisfy HasBodyAccelerometer");
+static_assert(HasBodyMagnetometer<IMUCombo>, "IMUType does not satisfy HasBodyMagnetometer");
+
 TEST_CASE("BMI270_MMC5983 configure succeeds with correct MMC5983 ID")
 {
     clear_spi_rx_buffer();

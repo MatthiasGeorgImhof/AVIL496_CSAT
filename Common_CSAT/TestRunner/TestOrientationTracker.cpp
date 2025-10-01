@@ -288,3 +288,41 @@ TEST_CASE("updateAccelerometerMagnetometer converges yaw orientation within enve
     // std::cerr << "Yaw Error (degrees): " << err * 180.0f / m_mpif << "\n";
     REQUIRE(std::abs(err) < 0.6f);
 }
+
+TEST_CASE("AccGyrMagOrientationTracker converges roll and pitch orientation") {
+    AccGyrMagOrientationTracker tracker;
+    tracker.setMagneticReference(1.0f, 0.0f, 0.0f);
+
+    // Set a target orientation with non-zero roll and pitch
+    Eigen::Quaternionf q_true(Eigen::AngleAxisf(m_mpif / 6.0f, Eigen::Vector3f::UnitX()) *  // 30 degrees roll
+                               Eigen::AngleAxisf(m_mpif / 4.0f, Eigen::Vector3f::UnitY()));  // 45 degrees pitch
+
+    Eigen::Vector3f accel_ned(0.0f, 0.0f, 9.81f);
+    Eigen::Vector3f mag_ned(1.0f, 0.0f, 0.0f);
+    Eigen::Vector3f accel_body = q_true.conjugate() * accel_ned;
+    Eigen::Vector3f mag_body = q_true.conjugate() * mag_ned;
+
+    // Zero the gyro
+    Eigen::Vector3f omega(0.0f, 0.0f, 0.0f);
+    tracker.setGyroAngularRate(omega);
+
+    float roll_true = std::atan2(2.f * (q_true.w() * q_true.x() + q_true.y() * q_true.z()), 1.f - 2.f * (q_true.x() * q_true.x() + q_true.y() * q_true.y()));
+    float pitch_true = std::asin(2.f * (q_true.w() * q_true.y() - q_true.z() * q_true.x()));
+
+    for (int i = 0; i < 20; ++i) {
+        tracker.updateAccelerometerMagnetometer(accel_body, mag_body, au::make_quantity<au::Milli<au::Seconds>>(100*i));
+
+        Eigen::Vector3f ypr = tracker.getYawPitchRoll();
+        float roll_est = ypr(2); // Roll is the third element
+        float pitch_est = ypr(1); // Pitch is the second element
+
+        float roll_error = std::abs(roll_est - roll_true);
+        float pitch_error = std::abs(pitch_est - pitch_true);
+
+        // Optionally add some noise to the sensor readings
+
+        // Check that the estimated roll and pitch are within acceptable bounds
+        REQUIRE(roll_error < 0.5f); // Adjust tolerance as needed
+        REQUIRE(pitch_error < 0.5f); // Adjust tolerance as needed
+    }
+}
