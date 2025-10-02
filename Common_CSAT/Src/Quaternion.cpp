@@ -1,5 +1,4 @@
 #include "Quaternion.hpp"
-#include <cmath>
 
 Eigen::Matrix<float, 3, 4> computeNumericalJacobian(const Eigen::Quaternionf &q, const Eigen::Vector3f &v)
 {
@@ -12,6 +11,7 @@ Eigen::Matrix<float, 3, 4> computeNumericalJacobian(const Eigen::Quaternionf &q,
         Eigen::Quaternionf q_minus = q;
         q_plus.normalize();
         q_minus.normalize();
+
 
         if (i == 0)
         {
@@ -60,33 +60,33 @@ Eigen::Matrix<float, 3, 4> computeAnalyticalJacobian(const Eigen::Quaternionf &q
     Eigen::Matrix<float, 3, 4> J;
 
     // d(R^T * v) / dx
-    J(0, 0) = 2.0f * x * vx + 2.0f * y * vy + 2.0f * z * vz;
-    J(1, 0) = 2.0f * y * vx - 2.0f * x * vy + 2.0f * w * vz;
-    J(2, 0) = 2.0f * z * vx - 2.0f * w * vy - 2.0f * x * vz;
+    J(0, 0) =  2.0f * x * vx + 2.0f * y * vy + 2.0f * z * vz;
+    J(1, 0) =  2.0f * y * vx - 2.0f * x * vy + 2.0f * w * vz;
+    J(2, 0) =  2.0f * z * vx - 2.0f * w * vy - 2.0f * x * vz;
 
     // d(...) / dy
     J(0, 1) = -2.0f * y * vx + 2.0f * x * vy - 2.0f * w * vz;
-    J(1, 1) = 2.0f * x * vx + 2.0f * y * vy + 2.0f * z * vz;
-    J(2, 1) = 2.0f * w * vx + 2.0f * z * vy - 2.0f * y * vz;
+    J(1, 1) =  2.0f * x * vx + 2.0f * y * vy + 2.0f * z * vz;
+    J(2, 1) =  2.0f * w * vx + 2.0f * z * vy - 2.0f * y * vz;
 
     // d(...) / dz
     J(0, 2) = -2.0f * z * vx + 2.0f * w * vy + 2.0f * x * vz;
     J(1, 2) = -2.0f * w * vx - 2.0f * z * vy + 2.0f * y * vz;
-    J(2, 2) = 2.0f * x * vx + 2.0f * y * vy + 2.0f * z * vz;
+    J(2, 2) =  2.0f * x * vx + 2.0f * y * vy + 2.0f * z * vz;
 
     // // d(...) / dw
-    J(0, 3) = 2.0f * w * vx + 2.0f * z * vy - 2.0f * y * vz;
+    J(0, 3) =  2.0f * w * vx + 2.0f * z * vy - 2.0f * y * vz;
     J(1, 3) = -2.0f * z * vx + 2.0f * w * vy + 2.0f * x * vz;
-    J(2, 3) = 2.0f * y * vx - 2.0f * x * vy + 2.0f * w * vz;
+    J(2, 3) =  2.0f * y * vx - 2.0f * x * vy + 2.0f * w * vz;
 
     // std::cerr << "Jacobian computed via analytical formula:\n" << J << std::endl;
     return J;
 }
 
 Eigen::Matrix<float, 3, 4> normalizeAnalyticalJacobian(
-    const Eigen::Matrix<float, 3, 4> &J_analytical,
-    const Eigen::Quaternionf &q,
-    const Eigen::Vector3f &v)
+    const Eigen::Matrix<float, 3, 4>& J_analytical,
+    const Eigen::Quaternionf& q,
+    const Eigen::Vector3f& v)
 {
     Eigen::Matrix<float, 3, 4> J_normalized;
     const float w = q.w(), x = q.x(), y = q.y(), z = q.z();
@@ -97,25 +97,14 @@ Eigen::Matrix<float, 3, 4> normalizeAnalyticalJacobian(
 
     for (int i = 0; i < 4; ++i)
     {
-        float qi = (i == 0) ? x : (i == 1) ? y
-                              : (i == 2)   ? z
-                                           : w;
+        float qi = (i == 0) ? x :
+                   (i == 1) ? y :
+                   (i == 2) ? z :
+                              w;
 
         J_normalized.col(i) = J_analytical.col(i) / N - (2.0f * qi / (N * N)) * v_rot;
     }
 
     // std::cerr << "Jacobian normalized via analytical formula:\n" << J_normalized << std::endl;
     return J_normalized;
-}
-
-Eigen::Vector3f getYawPitchRoll(const Eigen::Quaternionf &q)
-{
-    float sinp = 2.f * (q.w() * q.y() - q.z() * q.x());
-    sinp = std::clamp(sinp, -1.f, 1.f);
-
-    float yaw = atan2f(2.f * (q.w() * q.z() + q.x() * q.y()),
-                       1.f - 2.f * (q.y() * q.y() + q.z() * q.z()));
-    float pitch = asinf(sinp);
-    float roll = atan2f(2.f * (q.w() * q.x() + q.y() * q.z()), 1.f - 2.f * (q.x() * q.x() + q.y() * q.y()));
-    return Eigen::Vector3f(yaw, pitch, roll);
 }
