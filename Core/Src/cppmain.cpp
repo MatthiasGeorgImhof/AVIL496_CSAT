@@ -45,6 +45,9 @@
 #include "MMC5983.hpp"
 #include "MR25H10.hpp"
 #include "MMC5983.hpp"
+#include "OrientationTracker.hpp"
+#include "OrientationService.hpp"
+#include "TaskOrientationService.hpp"
 
 #include "au.hh"
 #include "au.hpp"
@@ -195,12 +198,6 @@ void cppmain()
 	O1HeapAllocator<TaskCheckMemory> alloc_TaskCheckMemory(o1heap);
 	registration_manager.add(allocate_unique_custom<TaskCheckMemory>(alloc_TaskCheckMemory, o1heap, 2000, 100));
 
-    subscription_manager.subscribe<SubscriptionManager::MessageTag>(registration_manager.getSubscriptions(), canard_adapters);
-    subscription_manager.subscribe<SubscriptionManager::ResponseTag>(registration_manager.getServers(), canard_adapters);
-    subscription_manager.subscribe<SubscriptionManager::RequestTag>(registration_manager.getClients(), canard_adapters);
-
-    ServiceManager service_manager(registration_manager.getHandlers());
-	service_manager.initializeServices(HAL_GetTick());
 
     power_switch.setState(0xff);
 
@@ -249,71 +246,89 @@ void cppmain()
 //    MR25H10<MramTransport> mram(mram_transport);
 //    (void) mag.readChipID();
 
+	using TrackerType = AccGyrMagOrientationTracker<7,6>;
+	using IMUType = BMI270_MMC5983<SPITransport<IMUConfigType>>;
+	using OrientationType = AccGyrMagOrientation<TrackerType, IMUType, IMUType>;
+	using OrientationTask = TaskOrientationService<OrientationType, Cyphal<CanardAdapter>>;
+	TrackerType tracker;
+	OrientationType orientation(&hrtc, tracker, imu, imu);
+	O1HeapAllocator<OrientationTask> alloc_TaskOrientationService(o1heap);
+	registration_manager.add(
+	    allocate_unique_custom<OrientationTask>(alloc_TaskOrientationService, orientation, 100, 5, 0, canard_adapters)
+	);
+
+	subscription_manager.subscribe<SubscriptionManager::MessageTag>(registration_manager.getSubscriptions(), canard_adapters);
+    subscription_manager.subscribe<SubscriptionManager::ResponseTag>(registration_manager.getServers(), canard_adapters);
+    subscription_manager.subscribe<SubscriptionManager::RequestTag>(registration_manager.getClients(), canard_adapters);
+
+    ServiceManager service_manager(registration_manager.getHandlers());
+	service_manager.initializeServices(HAL_GetTick());
+
     O1HeapAllocator<CyphalTransfer> allocator(o1heap);
 	LoopManager loop_manager(allocator);
 	while(1)
 	{
-		char buffer[256];
 		loop_manager.CanProcessTxQueue(&canard_adapter, &hcan1);
 		loop_manager.CanProcessRxQueue(&canard_cyphal, &service_manager, empty_adapters, can_rx_buffer);
 		loop_manager.LoopProcessRxQueue(&loopard_cyphal, &service_manager, empty_adapters);
 		service_manager.handleServices();
 
-//		sprintf(buffer, "SPI: %d %d %d \r\n", HAL_SPI_GetState(&hspi1), HAL_SPI_GetState(&hspi2), HAL_SPI_GetState(&hspi3));
-
-//		static constexpr uint8_t BMI270_READ_BIT = 0x80;
-//		HAL_GPIO_WritePin(GPIO_SPI2_GYRO_CS_GPIO_Port, GPIO_SPI2_GYRO_CS_Pin, GPIO_PIN_RESET);
-//		uint8_t tx[1] { 0x00 | BMI270_READ_BIT };
-//		uint8_t rx[2] {};
-//		bool okt = HAL_SPI_Transmit(&hspi2, tx, sizeof(tx), 100) == HAL_OK;
-//		bool okr = HAL_SPI_TransmitReceive(&hspi2, rx, rx, sizeof(rx), 100) == HAL_OK;
-//		HAL_GPIO_WritePin(GPIO_SPI2_GYRO_CS_GPIO_Port, GPIO_SPI2_GYRO_CS_Pin, GPIO_PIN_SET);
-//		sprintf(buffer, "SPI direct: %d %x\r\n", HAL_SPI_GetState(&hspi2), rx[1]);
-//		CDC_Transmit_FS((uint8_t*) buffer, strlen(buffer));
-//		(void) okr;
-//		(void) okt;
-
-//		HAL_Delay(250);
-		auto imu_acc = imu.readAccelerometer();
-		auto imu_gyr = imu.readGyroscope();
-		auto imu_tmp = imu.readThermometer();
-		auto imu_mag = imu.readMagnetometer();
-
-//		auto mag_chip = mag.readChipID();
-//		auto mag_tmp = mag.readRawThermometer();
-		auto mag_mag = mag.readMagnetometer();
-
-		sprintf(buffer, "SPI IMU: (%f %f %f) (%f %f %f) (%f) (%e %e %e) (%e %e %e)\r\n",
-				imu_acc.value()[0].in(au::metersPerSecondSquaredInBodyFrame),
-				imu_acc.value()[1].in(au::metersPerSecondSquaredInBodyFrame),
-				imu_acc.value()[2].in(au::metersPerSecondSquaredInBodyFrame),
-				imu_gyr.value()[0].in(au::degreesPerSecondInBodyFrame),
-				imu_gyr.value()[1].in(au::degreesPerSecondInBodyFrame),
-				imu_gyr.value()[2].in(au::degreesPerSecondInBodyFrame),
-				imu_tmp.value().in(au::celsius_qty),
-				imu_mag.value()[0].in(au::nano(au::teslaInBodyFrame)), imu_mag.value()[1].in(au::nano(au::teslaInBodyFrame)), imu_mag.value()[2].in(au::nano(au::teslaInBodyFrame)),
-				mag_mag.value()[0].in(au::nano(au::teslaInBodyFrame)), mag_mag.value()[1].in(au::nano(au::teslaInBodyFrame)), mag_mag.value()[2].in(au::nano(au::teslaInBodyFrame)));
-
-//		HAL_Delay(250);
+//		char buffer[256];
+////		sprintf(buffer, "SPI: %d %d %d \r\n", HAL_SPI_GetState(&hspi1), HAL_SPI_GetState(&hspi2), HAL_SPI_GetState(&hspi3));
+//
+////		static constexpr uint8_t BMI270_READ_BIT = 0x80;
+////		HAL_GPIO_WritePin(GPIO_SPI2_GYRO_CS_GPIO_Port, GPIO_SPI2_GYRO_CS_Pin, GPIO_PIN_RESET);
+////		uint8_t tx[1] { 0x00 | BMI270_READ_BIT };
+////		uint8_t rx[2] {};
+////		bool okt = HAL_SPI_Transmit(&hspi2, tx, sizeof(tx), 100) == HAL_OK;
+////		bool okr = HAL_SPI_TransmitReceive(&hspi2, rx, rx, sizeof(rx), 100) == HAL_OK;
+////		HAL_GPIO_WritePin(GPIO_SPI2_GYRO_CS_GPIO_Port, GPIO_SPI2_GYRO_CS_Pin, GPIO_PIN_SET);
+////		sprintf(buffer, "SPI direct: %d %x\r\n", HAL_SPI_GetState(&hspi2), rx[1]);
+////		CDC_Transmit_FS((uint8_t*) buffer, strlen(buffer));
+////		(void) okr;
+////		(void) okt;
+//
+////		HAL_Delay(250);
+//		auto imu_acc = imu.readAccelerometer();
+//		auto imu_gyr = imu.readGyroscope();
+//		auto imu_tmp = imu.readThermometer();
+//		auto imu_mag = imu.readMagnetometer();
+//
+////		auto mag_chip = mag.readChipID();
+////		auto mag_tmp = mag.readRawThermometer();
+//		auto mag_mag = mag.readMagnetometer();
+//
+//		sprintf(buffer, "SPI IMU: (%+f %+f %+f) (%+f %+f %+f) (%f) (%+e %+e %+e) (%+e %+e %+e)\r\n",
+//				imu_acc.value()[0].in(au::metersPerSecondSquaredInBodyFrame),
+//				imu_acc.value()[1].in(au::metersPerSecondSquaredInBodyFrame),
+//				imu_acc.value()[2].in(au::metersPerSecondSquaredInBodyFrame),
+//				imu_gyr.value()[0].in(au::degreesPerSecondInBodyFrame),
+//				imu_gyr.value()[1].in(au::degreesPerSecondInBodyFrame),
+//				imu_gyr.value()[2].in(au::degreesPerSecondInBodyFrame),
+//				imu_tmp.value().in(au::celsius_qty),
+//				imu_mag.value()[0].in(au::nano(au::teslaInBodyFrame)), imu_mag.value()[1].in(au::nano(au::teslaInBodyFrame)), imu_mag.value()[2].in(au::nano(au::teslaInBodyFrame)),
+//				mag_mag.value()[0].in(au::nano(au::teslaInBodyFrame)), mag_mag.value()[1].in(au::nano(au::teslaInBodyFrame)), mag_mag.value()[2].in(au::nano(au::teslaInBodyFrame)));
+//
+////		HAL_Delay(250);
 //		auto aux_mag = imu.readRawMagnetometer();
 //		auto spi_mag = mag.readRawMagnetometer();
 //		(void) aux_mag;
 //		(void) spi_mag;
 //		sprintf(buffer, "MAGs %ld %ld %ld %ld %ld %ld \r\n",
 //				aux_mag[0], aux_mag[1], aux_mag[2], spi_mag[0], spi_mag[1], spi_mag[2]);
-
-
-//	    auto imu_id = imu.readChipID();
-//	    auto mag_id = mag.readChipID();
-//	    auto mram_id = mram.readStatus();
-//	    auto power = power_switch.getState();
 //
-//		PowerMonitorData data;
-//		power_monitor(data);
-//		sprintf(buffer, "IMU ID: %u %u %u %u\r\nINA226: %4x %4x % 6d % 6d % 6d % 6d\r\n", power, imu_id.value(), mag_id.value(), mram_id.value(),
-//			  data.manufacturer_id, data.die_id, data.voltage_shunt_uV, data.voltage_bus_mV, data.power_mW, data.current_uA);
-
-		CDC_Transmit_FS((uint8_t*) buffer, strlen(buffer));
-		HAL_Delay(100);
+//
+////	    auto imu_id = imu.readChipID();
+////	    auto mag_id = mag.readChipID();
+////	    auto mram_id = mram.readStatus();
+////	    auto power = power_switch.getState();
+////
+////		PowerMonitorData data;
+////		power_monitor(data);
+////		sprintf(buffer, "IMU ID: %u %u %u %u\r\nINA226: %4x %4x % 6d % 6d % 6d % 6d\r\n", power, imu_id.value(), mag_id.value(), mram_id.value(),
+////			  data.manufacturer_id, data.die_id, data.voltage_shunt_uV, data.voltage_bus_mV, data.power_mW, data.current_uA);
+//
+//		CDC_Transmit_FS((uint8_t*) buffer, strlen(buffer));
+//		HAL_Delay(100);
 	}
 }

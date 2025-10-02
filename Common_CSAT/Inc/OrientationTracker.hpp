@@ -15,6 +15,28 @@
 #include "mock_hal.h"
 #endif
 
+// Gyroscope NED (front, right, down)
+// Orientation	Axis Rotation Positive Direction
+// front		X	Roll	Right wing down
+// right/east	Y	Pitch	Nose up
+// down			Z	Yaw		Nose right
+
+// Magnetometer NED (front, right, down)
+// Katy TX
+// Device Heading	Sensor X (forward)	Sensor Y (left)	Sensor Z (down)
+// North			+22.9 µT		–2.2 µT				+41 µT
+// East				-2.2 µT			-22.9 µT			+41 µT
+// South			–22.9 µT		+2.2 µT				+41 µT
+// West				+2.2 µT			+22.9 µT			+41 µT
+
+// Accelerometer is front (+0.91), left/west (+9.81). up (+9.81)
+// wanted NED (front east down) to have positive +9.81 when oriented
+// Orientation	Axis Rotation Positive Direction
+// front		X	-9.81 when x back points
+// right/east	Y	+9.81 when y points up
+// down			Z	+9.81
+
+
 template <int StateSize, int MeasurementSize>
 class BaseOrientationTracker
 {
@@ -233,7 +255,7 @@ public:
               Eigen::Matrix<float, MeasurementSize, MeasurementSize>::Identity() * 0.001f,
               Eigen::Matrix<float, StateSize, StateSize>::Identity() * 1e-5f,
               []
-              { StateVector x; x << 0.f, 0.f, 0.f, 1.f, 0.f, 0.f, 0.f; return x; }()), accel_ned(0.f, 0.f, 9.81f), magnetic_ned(0.3f, 0.5f, 0.8f)
+              { StateVector x; x << 0.f, 0.f, 0.f, 1.f, 0.f, 0.f, 0.f; return x; }()), accel_ned(0.f, 0.f, 9.81f), magnetic_ned(0.51f, 0.04f, 0.89f)
     {
     }
 

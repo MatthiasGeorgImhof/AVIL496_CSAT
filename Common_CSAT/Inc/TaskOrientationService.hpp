@@ -9,10 +9,24 @@
 #include "_4111Spyglass.h"
 #include "nunavut_assert.h"
 #include "uavcan/si/sample/angle/Quaternion_1_0.h"
+#include <cmath>
 #include <cstring>
 #include <chrono>
 #include <cstdint>
 #include <array>
+
+std::array<float, 3> getYawPitchRoll(const std::array<float, 4> &q)
+{
+    float sinp = 2.f * (q[0] * q[2] - q[3] * q[1]);
+    sinp = std::clamp(sinp, -1.f, 1.f);
+
+    float yaw = atan2f(2.f * (q[0] * q[3] + q[1] * q[2]),
+                       1.f - 2.f * (q[2] * q[2] + q[3] * q[3]));
+    float pitch = asinf(sinp);
+    float roll = atan2f(2.f * (q[0] * q[1] + q[2] * q[3]), 1.f - 2.f * (q[1] * q[1] + q[2] * q[2]));
+    return {yaw, pitch, roll};
+}
+
 
 template <typename Tracker, typename... Adapters>
 class TaskOrientationService : public TaskWithPublication<Adapters...>
@@ -42,6 +56,11 @@ void TaskOrientationService<Tracker, Adapters...>::handleTaskImpl()
     uavcan_si_sample_angle_Quaternion_1_0 data;
     data.timestamp.microsecond = timestamp.in(au::micro(au::seconds));
     memcpy(data.wxyz, q.data(), sizeof(data.wxyz));
+
+    std::array<float, 3> orientation = getYawPitchRoll(q);
+    constexpr float M_PIf = static_cast<float>(std::numbers::pi);
+    constexpr float RAD_TO_DEG = 180.0f / M_PIf;
+    log(LOG_LEVEL_DEBUG, "TaskOrientationService %f %f %f\r\n", orientation[0]*RAD_TO_DEG, orientation[1]*RAD_TO_DEG, orientation[2]*RAD_TO_DEG);
 
     constexpr size_t PAYLOAD_SIZE = uavcan_si_sample_angle_Quaternion_1_0_SERIALIZATION_BUFFER_SIZE_BYTES_;
     uint8_t payload[PAYLOAD_SIZE];

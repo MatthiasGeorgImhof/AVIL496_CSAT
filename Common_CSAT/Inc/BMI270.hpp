@@ -401,8 +401,15 @@ std::optional<AccelerationInBodyFrame> BMI270<Transport>::readAccelerometer() co
 		return std::nullopt;
 	}
 
+	// Accelerometer is front (+0.91), left/west (+9.81). up (+9.81)
+	// wanted NED (front east down) to have positive +9.81 when oriented
+	// Orientation	Axis Rotation Positive Direction
+	// front		X	-9.81 when x back points
+	// right/east	Y	+9.81 when y points up
+	// down			Z	+9.81
+
 	return AccelerationInBodyFrame{
-		convertAcc(rx_buf[1], rx_buf[2]),
+		-convertAcc(rx_buf[1], rx_buf[2]),
 		convertAcc(rx_buf[3], rx_buf[4]),
 		convertAcc(rx_buf[5], rx_buf[6])};
 }
@@ -419,10 +426,17 @@ std::optional<AngularVelocityInBodyFrame> BMI270<Transport>::readGyroscope() con
 		return std::nullopt;
 	}
 
+	// Gyroscope is front, left/west. up
+	// wanted
+	// Orientation	Axis Rotation Positive Direction
+	// front		X	Roll	Right wing down
+	// right/east	Y	Pitch	Nose up
+	// down		Z	Yaw		Nose right
+
 	return AngularVelocityInBodyFrame{
 		convertGyr(rx_buf[1], rx_buf[2]),
-		convertGyr(rx_buf[3], rx_buf[4]),
-		convertGyr(rx_buf[5], rx_buf[6])};
+		-convertGyr(rx_buf[3], rx_buf[4]),
+		-convertGyr(rx_buf[5], rx_buf[6])};
 }
 
 template <typename Transport>

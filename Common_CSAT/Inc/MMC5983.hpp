@@ -58,8 +58,18 @@ public:
         constexpr float COUNT_PER_GAUSS = 16384.f;
         constexpr float GAUSS_PER_TESLA = 10000.f;
         constexpr float TESLA_PER_COUNT = 1.f / (COUNT_PER_GAUSS * GAUSS_PER_TESLA);
+
+        // MMC5983 sensor frame is left handed: front x, left y, z down
+        // want: Magnetometer NED (front, right, down)
+        // Katy TX
+        // Device Heading	Sensor X (forward)	Sensor Y (left)	Sensor Z (down)
+        // North			+22.9 µT		–2.2 µT				+41 µT
+        // East				-2.2 µT			-22.9 µT			+41 µT
+        // South			–22.9 µT		+2.2 µT				+41 µT
+        // West				+2.2 µT			+22.9 µT			+41 µT
+
         return { au::make_quantity<au::TeslaInBodyFrame>(mag[0] * TESLA_PER_COUNT),
-		au::make_quantity<au::TeslaInBodyFrame>(mag[1] * TESLA_PER_COUNT),
+		-au::make_quantity<au::TeslaInBodyFrame>(mag[1] * TESLA_PER_COUNT),
 		au::make_quantity<au::TeslaInBodyFrame>(mag[2] * TESLA_PER_COUNT)
         };
     }
