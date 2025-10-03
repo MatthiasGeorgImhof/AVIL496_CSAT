@@ -14,9 +14,9 @@
 #include "mock_hal.h"
 #endif
 
-constexpr float M_PIf = static_cast<float>(std::numbers::pi);
-constexpr float DEG_TO_RAD = M_PIf / 180.0f; // Conversion factor from degrees to radians
-constexpr float RAD_TO_DEG = 180.0f / M_PIf; // Conversion factor from radians to degrees
+constexpr float m_pif = static_cast<float>(std::numbers::pi);
+constexpr float DEG_TO_RAD = m_pif / 180.0f; // Conversion factor from degrees to radians
+constexpr float RAD_TO_DEG = 180.0f / m_pif; // Conversion factor from radians to degrees
 
 inline Eigen::Vector3f rotateNEDtoECEF(const Eigen::Vector3f &ned_vector, float lat_deg, float lon_deg)
 {

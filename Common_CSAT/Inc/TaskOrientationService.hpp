@@ -14,6 +14,7 @@
 #include <chrono>
 #include <cstdint>
 #include <array>
+#include <numbers>
 
 std::array<float, 3> getYawPitchRoll(const std::array<float, 4> &q)
 {
@@ -58,8 +59,8 @@ void TaskOrientationService<Tracker, Adapters...>::handleTaskImpl()
     memcpy(data.wxyz, q.data(), sizeof(data.wxyz));
 
     std::array<float, 3> orientation = getYawPitchRoll(q);
-    constexpr float M_PIf = static_cast<float>(std::numbers::pi);
-    constexpr float RAD_TO_DEG = 180.0f / M_PIf;
+    constexpr float m_pif = static_cast<float>(std::numbers::pi);
+    constexpr float RAD_TO_DEG = 180.0f / m_pif;
     log(LOG_LEVEL_DEBUG, "TaskOrientationService %f %f %f\r\n", orientation[0]*RAD_TO_DEG, orientation[1]*RAD_TO_DEG, orientation[2]*RAD_TO_DEG);
 
     constexpr size_t PAYLOAD_SIZE = uavcan_si_sample_angle_Quaternion_1_0_SERIALIZATION_BUFFER_SIZE_BYTES_;

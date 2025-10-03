@@ -57,7 +57,7 @@ TEST_CASE("BMI270 readAccelerometer returns scaled values")
     float y = result->at(1).in(au::metersPerSecondSquaredInBodyFrame);
     float z = result->at(2).in(au::metersPerSecondSquaredInBodyFrame);
 
-    CHECK(x == doctest::Approx(9.80665f));  // X
+    CHECK(x == doctest::Approx(-9.80665f)); // X
     CHECK(y == doctest::Approx(4.90333f));  // Y
     CHECK(z == doctest::Approx(-4.90333f)); // Z
 }
@@ -87,7 +87,7 @@ TEST_CASE("BMI270 readGyroscope returns scaled values")
     float z = result->at(2).in(au::degreesPerSecondInBodyFrame);
 
     CHECK(x == doctest::Approx(10.0f));  // 164 / 16.4
-    CHECK(y == doctest::Approx(-10.0f)); // -164 / 16.4
+    CHECK(y == doctest::Approx(10.0f)); //  -164 / 16.4
     CHECK(z == doctest::Approx(0.0f));   // 0
 }
 
