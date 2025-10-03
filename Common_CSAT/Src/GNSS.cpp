@@ -73,176 +73,161 @@ GNSS::GNSS(UART_HandleTypeDef *huart) : huart(huart) {}
  * Searching for a header in data buffer and matching class and message ID to buffer data.
  * @param GNSS Pointer to main GNSS structure.
  */
-uint8_t *GNSS::FindHeader(uint8_t classID, uint8_t messageID)
+uint8_t *GNSS::findHeader(UBXClass classID, UBXMessageID messageID)
 {
-	constexpr uint16_t SIZE = sizeof(uartBuffer) / 2;
+	constexpr uint16_t SIZE = sizeof(uart_buffer) / 2;
 	for (uint16_t var = 0; var <= SIZE; ++var)
 	{
-		if (uartBuffer[var] == 0xB5 && uartBuffer[var + 1] == 0x62)
+		if (uart_buffer[var] == 0xB5 && uart_buffer[var + 1] == 0x62)
 		{
-			uint16_t length = GetUShort(uartBuffer, static_cast<uint16_t>(var + 4));
-			uint8_t cka_message = GetUByte(uartBuffer, static_cast<uint16_t>(var + length + UBLOX_HEADER_SIZE));
-			uint8_t ckb_message = GetUByte(uartBuffer, static_cast<uint16_t>(var + length + UBLOX_HEADER_SIZE + 1));
+			uint16_t length = GNSSCore::getUShort(uart_buffer, static_cast<uint16_t>(var + 4));
+			uint8_t cka_message = GNSSCore::getUByte(uart_buffer, static_cast<uint16_t>(var + length + UBLOX_HEADER_SIZE));
+			uint8_t ckb_message = GNSSCore::getUByte(uart_buffer, static_cast<uint16_t>(var + length + UBLOX_HEADER_SIZE + 1));
 			uint8_t cka, ckb;
-			Checksum(length + 4U, &uartBuffer[var + 2], &cka, &ckb);
+			GNSSCore::checksum(length + 4U, &uart_buffer[var + 2], &cka, &ckb);
 			if (cka != cka_message && ckb != ckb_message)
 			{
 				return nullptr;
 			}
-			if (uartBuffer[var + 2] == classID && uartBuffer[var + 3] == messageID)
+			if (uart_buffer[var + 2] == static_cast<uint8_t>(classID) && uart_buffer[var + 3] == static_cast<uint8_t>(messageID))
 			{
-				return uartBuffer + var + UBLOX_HEADER_SIZE;
+				return uart_buffer + var + UBLOX_HEADER_SIZE;
 			}
 		}
 	}
 	return nullptr;
 }
 
-uint8_t *GNSS::Request(const uint8_t *request, uint16_t size, uint8_t classID, uint8_t messageID)
+uint8_t *GNSS::request(const uint8_t *request, uint16_t size, UBXClass classID, UBXMessageID messageID)
 {
 	HAL_UART_Transmit(huart, const_cast<uint8_t *>(request), size, 50);
-	HAL_UART_Receive(huart, uartBuffer, sizeof(uartBuffer), 500);
-	return FindHeader(classID, messageID);
+	HAL_UART_Receive(huart, uart_buffer, sizeof(uart_buffer), 500);
+	return findHeader(classID, messageID);
 }
-
-/*!
- * Make request for unique chip ID data.
- */
-// UBX Class and Message ID constants
-constexpr uint8_t UBX_CLASS_MON = 0x27;
-constexpr uint8_t UBX_CLASS_NAV = 0x01;
-
-constexpr uint8_t UBX_ID_UNIQID = 0x03;
-constexpr uint8_t UBX_ID_TIMEUTC = 0x21;
-constexpr uint8_t UBX_ID_POSLLH = 0x02;
-constexpr uint8_t UBX_ID_POSECEF = 0x01;
-constexpr uint8_t UBX_ID_PVT = 0x07;
-constexpr uint8_t UBX_ID_VELECEF = 0x11;
-constexpr uint8_t UBX_ID_VELNED = 0x12;
 
 std::optional<UniqueID> GNSS::getUniqID()
 {
-	uint8_t *messageBuffer = Request(getUniqueID, sizeof(getUniqueID), UBX_CLASS_MON, UBX_ID_UNIQID);
+	uint8_t *messageBuffer = request(GET_UNIQUE_ID, sizeof(GET_UNIQUE_ID), UBXClass::MON, UBXMessageID::UNIQ_ID);
 	if (messageBuffer == nullptr)
 		return std::nullopt;
-	return ParseUniqID(messageBuffer);
+	return GNSSCore::parseUniqID(messageBuffer);
 }
 
 /*!
  * Make request for UTC time solution data.
  */
-std::optional<UTCTime> GNSS::GetNavTimeUTC()
+std::optional<UTCTime> GNSS::getNavTimeUTC()
 {
-	uint8_t *messageBuffer = Request(getNavTimeUTC, sizeof(getNavTimeUTC), UBX_CLASS_NAV, UBX_ID_TIMEUTC);
+	uint8_t *messageBuffer = request(GET_NAV_TIME_UTC, sizeof(GET_NAV_TIME_UTC), UBXClass::NAV, UBXMessageID::UTC_TIME);
 	if (messageBuffer == nullptr)
 		return std::nullopt;
-	return ParseNavTimeUTC(messageBuffer);
+	return GNSSCore::parseNavTimeUTC(messageBuffer);
 }
 
 /*!
  * Make request for geodetic position solution data.
  */
-std::optional<PositionLLH> GNSS::GetNavPosLLH()
+std::optional<PositionLLH> GNSS::getNavPosLLH()
 {
-	uint8_t *messageBuffer = Request(getNavPosLLH, sizeof(getNavPosLLH), UBX_CLASS_NAV, UBX_ID_POSLLH);
+	uint8_t *messageBuffer = request(GET_NAV_POS_LLH, sizeof(GET_NAV_POS_LLH), UBXClass::NAV, UBXMessageID::POS_LLH);
 	if (messageBuffer == nullptr)
 		return std::nullopt;
-	return ParseNavPosLLH(messageBuffer);
+	return GNSSCore::parseNavPosLLH(messageBuffer);
 }
 
 /*!
  * Make request for earth centric position solution data.
  */
-std::optional<PositionECEF> GNSS::GetNavPosECEF()
+std::optional<PositionECEF> GNSS::getNavPosECEF()
 {
-	uint8_t *messageBuffer = Request(getNavPosECEF, sizeof(getNavPosECEF), UBX_CLASS_NAV, UBX_ID_POSECEF);
+	uint8_t *messageBuffer = request(GET_NAV_POS_ECEF, sizeof(GET_NAV_POS_ECEF), UBXClass::NAV, UBXMessageID::POS_ECEF);
 	if (messageBuffer == nullptr)
 		return std::nullopt;
-	return ParseNavPosECEF(messageBuffer);
+	return GNSSCore::parseNavPosECEF(messageBuffer);
 }
 
 /*!
  * Make request for navigation position velocity time solution data.
  */
-std::optional<NavigationPVT> GNSS::GetNavPVT()
+std::optional<NavigationPVT> GNSS::getNavPVT()
 {
-	uint8_t *messageBuffer = Request(getNavPVT, sizeof(getNavPVT), UBX_CLASS_NAV, UBX_ID_PVT);
+	uint8_t *messageBuffer = request(GET_NAV_PVT, sizeof(GET_NAV_PVT), UBXClass::NAV, UBXMessageID::PVT);
 	if (messageBuffer == nullptr)
 		return std::nullopt;
-	return ParseNavPVT(messageBuffer);
+	return GNSSCore::parseNavPVT(messageBuffer);
 }
 
 /*!
  * Make request for geocentric navigation velocity solution data.
  */
-std::optional<VelocityNED> GNSS::GetNavVelNED()
+std::optional<VelocityNED> GNSS::getNavVelNED()
 {
-	uint8_t *messageBuffer = Request(getNavVelNED, sizeof(getNavVelNED), UBX_CLASS_NAV, UBX_ID_VELNED);
+	uint8_t *messageBuffer = request(GET_NAV_VEL_NED, sizeof(GET_NAV_VEL_NED), UBXClass::NAV, UBXMessageID::VEL_NED);
 	if (messageBuffer == nullptr)
 		return std::nullopt;
-	return ParseNavVelNED(messageBuffer);
+	return GNSSCore::parseNavVelNED(messageBuffer);
 }
 
 /*!
  * Make request for earth centric navigation velocity solution data.
  */
-std::optional<VelocityECEF> GNSS::GetNavVelECEF()
+std::optional<VelocityECEF> GNSS::getNavVelECEF()
 {
-	uint8_t *messageBuffer = Request(getNavVelECEF, sizeof(getNavVelECEF), UBX_CLASS_NAV, UBX_ID_VELECEF);
+	uint8_t *messageBuffer = request(GET_NAV_VEL_ECEF, sizeof(GET_NAV_VEL_ECEF), UBXClass::NAV, UBXMessageID::VEL_ECEF);
 	if (messageBuffer == nullptr)
 		return std::nullopt;
-	return ParseNavVelECEF(messageBuffer);
+	return GNSSCore::parseNavVelECEF(messageBuffer);
 }
 
 /*!
  * Changing the GNSS mode.
  */
-void GNSS::SetMode(GNSSMode gnssMode)
+void GNSS::setMode(GNSSMode gnssMode)
 {
 	uint8_t *dataToSend = nullptr;
 	size_t dataSize = 0;
 
 	switch (gnssMode)
 	{
-	case 0:
-		dataToSend = const_cast<uint8_t *>(setPortableMode);
-		dataSize = sizeof(setPortableMode);
+	case GNSSMode::Portable:
+		dataToSend = const_cast<uint8_t *>(SET_PORTABLE_MODE);
+		dataSize = sizeof(SET_PORTABLE_MODE);
 		break;
-	case 1:
-		dataToSend = const_cast<uint8_t *>(setStationaryMode);
-		dataSize = sizeof(setStationaryMode);
+	case GNSSMode::Stationary:
+		dataToSend = const_cast<uint8_t *>(SET_STATIONARY_MODE);
+		dataSize = sizeof(SET_STATIONARY_MODE);
 		break;
-	case 2:
-		dataToSend = const_cast<uint8_t *>(setPedestrianMode);
-		dataSize = sizeof(setPedestrianMode);
+	case GNSSMode::Pedestrian:
+		dataToSend = const_cast<uint8_t *>(SET_PEDESTRIAN_MODE);
+		dataSize = sizeof(SET_PEDESTRIAN_MODE);
 		break;
-	case 3:
-		dataToSend = const_cast<uint8_t *>(setAutomotiveMode);
-		dataSize = sizeof(setAutomotiveMode);
+	case GNSSMode::Automotive:
+		dataToSend = const_cast<uint8_t *>(SET_AUTOMOTIVE_MODE);
+		dataSize = sizeof(SET_AUTOMOTIVE_MODE);
 		break;
-	case 4:
-		dataToSend = const_cast<uint8_t *>(setSeaMode);
-		dataSize = sizeof(setSeaMode);
+	case GNSSMode::Sea:
+		dataToSend = const_cast<uint8_t *>(SET_SEA_MODE);
+		dataSize = sizeof(SET_SEA_MODE);
 		break;
-	case 5:
-		dataToSend = const_cast<uint8_t *>(setAirbone1GMode);
-		dataSize = sizeof(setAirbone1GMode);
+	case GNSSMode::Airborne1G:
+		dataToSend = const_cast<uint8_t *>(SET_AIRBORNE_1G_MODE);
+		dataSize = sizeof(SET_AIRBORNE_1G_MODE);
 		break;
-	case 6:
-		dataToSend = const_cast<uint8_t *>(setAirbone2GMode);
-		dataSize = sizeof(setAirbone2GMode);
+	case GNSSMode::Airborne2G:
+		dataToSend = const_cast<uint8_t *>(SET_AIRBORNE_2G_MODE);
+		dataSize = sizeof(SET_AIRBORNE_2G_MODE);
 		break;
-	case 7:
-		dataToSend = const_cast<uint8_t *>(setAirbone4GMode);
-		dataSize = sizeof(setAirbone4GMode);
+	case GNSSMode::Airborne4G:
+		dataToSend = const_cast<uint8_t *>(SET_AIRBORNE_4G_MODE);
+		dataSize = sizeof(SET_AIRBORNE_4G_MODE);
 		break;
-	case 8:
-		dataToSend = const_cast<uint8_t *>(setWristMode);
-		dataSize = sizeof(setWristMode);
+	case GNSSMode::Wrist:
+		dataToSend = const_cast<uint8_t *>(SET_WRIST_MODE);
+		dataSize = sizeof(SET_WRIST_MODE);
 		break;
-	case 9:
-		dataToSend = const_cast<uint8_t *>(setBikeMode);
-		dataSize = sizeof(setBikeMode);
+	case GNSSMode::Bike:
+		dataToSend = const_cast<uint8_t *>(SET_BIKE_MODE);
+		dataSize = sizeof(SET_BIKE_MODE);
 		break;
 	default:
 		return;
@@ -257,150 +242,152 @@ void GNSS::SetMode(GNSSMode gnssMode)
 /*!
  * Parse data to unique chip ID standard.
  */
-UniqueID GNSS::ParseUniqID(uint8_t *messageBuffer)
+UniqueID GNSSCore::parseUniqID(uint8_t *messageBuffer)
 {
 	return UniqueID{
-		.id = {GetUByte(messageBuffer, 4),
-			   GetUByte(messageBuffer, 5),
-			   GetUByte(messageBuffer, 6),
-			   GetUByte(messageBuffer, 7),
-			   GetUByte(messageBuffer, 8),
-			   GetUByte(messageBuffer, 9)}};
+		.id = {getUByte(messageBuffer, 4),
+			   getUByte(messageBuffer, 5),
+			   getUByte(messageBuffer, 6),
+			   getUByte(messageBuffer, 7),
+			   getUByte(messageBuffer, 8),
+			   getUByte(messageBuffer, 9)}};
 }
 
 /*!
  * Parse data to navigation position velocity time solution standard.
  */
-NavigationPVT GNSS::ParseNavPVT(uint8_t *messageBuffer)
+NavigationPVT GNSSCore::parseNavPVT(uint8_t *messageBuffer)
 {
 	return NavigationPVT{
 		.utcTime = {
-			.year = GetUShort(messageBuffer, 4),							  // year
-			.month = GetUByte(messageBuffer, 6),							  // month
-			.day = GetUByte(messageBuffer, 7),								  // day
-			.hour = GetUByte(messageBuffer, 8),								  // hour
-			.min = GetUByte(messageBuffer, 9),								  // min
-			.sec = GetUByte(messageBuffer, 10),								  // sec
-			.nano = GetILong(messageBuffer, 16),							  // nano seconds
-			.tAcc = GetULong(messageBuffer, 12),							  // time accuracy
-			.valid = static_cast<uint8_t>(GetUByte(messageBuffer, 11) & 0x0f) // valid flags
+			.year = getUShort(messageBuffer, 4),							  // year
+			.month = getUByte(messageBuffer, 6),							  // month
+			.day = getUByte(messageBuffer, 7),								  // day
+			.hour = getUByte(messageBuffer, 8),								  // hour
+			.min = getUByte(messageBuffer, 9),								  // min
+			.sec = getUByte(messageBuffer, 10),								  // sec
+			.nano = getILong(messageBuffer, 16),							  // nano seconds
+			.tAcc = getULong(messageBuffer, 12),							  // time accuracy
+			.valid = static_cast<uint8_t>(getUByte(messageBuffer, 11) & 0x0f) // valid flags
 		},
-		.position = {									// position are in mm, so we divide by 10 to get cm
-			.lon = GetILong(messageBuffer, 24),			// longitude
-			.lat = GetILong(messageBuffer, 28),			// latitude
-			.height = GetILong(messageBuffer, 32) / 10, // height above ellipsoid
-			.hMSL = GetILong(messageBuffer, 36) / 10,	// height above mean sea level
-			.hAcc = GetULong(messageBuffer, 40) / 10,	// horizontal accuracy estimate
-			.vAcc = GetULong(messageBuffer, 44) / 10	// vertical accuracy estimate
+		.position = {
+			// position are in mm, so we divide by 10 to get cm
+			.lon = getILong(messageBuffer, 24),			// longitude
+			.lat = getILong(messageBuffer, 28),			// latitude
+			.height = getILong(messageBuffer, 32) / 10, // height above ellipsoid
+			.hMSL = getILong(messageBuffer, 36) / 10,	// height above mean sea level
+			.hAcc = getULong(messageBuffer, 40) / 10,	// horizontal accuracy estimate
+			.vAcc = getULong(messageBuffer, 44) / 10	// vertical accuracy estimate
 		},
-		.velocity = {									// velocities are in mm/s, so we divide by 10 to get cm/s
-			.velN = GetILong(messageBuffer, 48) / 10, 	// north velocity component
-			.velE = GetILong(messageBuffer, 52) / 10, 	// east velocity component
-			.velD = GetILong(messageBuffer, 56) / 10, 	// down velocity component
-			.headMot = GetILong(messageBuffer, 64),	  	// heading of motion (2-D)
+		.velocity = {
+			// velocities are in mm/s, so we divide by 10 to get cm/s
+			.velN = getILong(messageBuffer, 48) / 10, // north velocity component
+			.velE = getILong(messageBuffer, 52) / 10, // east velocity component
+			.velD = getILong(messageBuffer, 56) / 10, // down velocity component
+			.headMot = getILong(messageBuffer, 64),	  // heading of motion (2-D)
 			.speed = 0,
-			.gSpeed = GetULong(messageBuffer, 60) / 10, // ground speed estimate
-			.sAcc = GetULong(messageBuffer, 68),		// speed accuracy estimate
-			.headAcc = GetULong(messageBuffer, 72)		// heading accuracy estimate
+			.gSpeed = getULong(messageBuffer, 60) / 10, // ground speed estimate
+			.sAcc = getULong(messageBuffer, 68),		// speed accuracy estimate
+			.headAcc = getULong(messageBuffer, 72)		// heading accuracy estimate
 		},
-		.fixType = GetIByte(messageBuffer, 20), // fix type
-		.numSV = GetUByte(messageBuffer, 23)	// number of satellites used
+		.fixType = getIByte(messageBuffer, 20), // fix type
+		.numSV = getUByte(messageBuffer, 23)	// number of satellites used
 	};
 }
 
 /*!
  * Parse data to UTC time solution standard.
  */
-UTCTime GNSS::ParseNavTimeUTC(uint8_t *messageBuffer)
+UTCTime GNSSCore::parseNavTimeUTC(uint8_t *messageBuffer)
 {
 	return UTCTime{
-		.year = GetUShort(messageBuffer, 12),							  // year
-		.month = GetUByte(messageBuffer, 14),							  // month
-		.day = GetUByte(messageBuffer, 15),								  // day
-		.hour = GetUByte(messageBuffer, 16),							  // hour
-		.min = GetUByte(messageBuffer, 17),								  // min
-		.sec = GetUByte(messageBuffer, 18),								  // sec
-		.nano = GetILong(messageBuffer, 8),								  // nano seconds
-		.tAcc = GetULong(messageBuffer, 4),								  // time accuracy
-		.valid = static_cast<uint8_t>(GetUByte(messageBuffer, 19) & 0x0f) // valid flags
+		.year = getUShort(messageBuffer, 12),							  // year
+		.month = getUByte(messageBuffer, 14),							  // month
+		.day = getUByte(messageBuffer, 15),								  // day
+		.hour = getUByte(messageBuffer, 16),							  // hour
+		.min = getUByte(messageBuffer, 17),								  // min
+		.sec = getUByte(messageBuffer, 18),								  // sec
+		.nano = getILong(messageBuffer, 8),								  // nano seconds
+		.tAcc = getULong(messageBuffer, 4),								  // time accuracy
+		.valid = static_cast<uint8_t>(getUByte(messageBuffer, 19) & 0x0f) // valid flags
 	};
 }
 
 /*!
  * Parse data to geodetic position solution standard.
  */
-PositionLLH GNSS::ParseNavPosLLH(uint8_t *messageBuffer)
+PositionLLH GNSSCore::parseNavPosLLH(uint8_t *messageBuffer)
 {
 	return PositionLLH{
-		.lon = GetILong(messageBuffer, 4),	   // lon
-		.lat = GetILong(messageBuffer, 8),	   // lat
-		.height = GetILong(messageBuffer, 12), // height
-		.hMSL = GetILong(messageBuffer, 16),   // hMSL
-		.hAcc = GetULong(messageBuffer, 20),   // hAcc
-		.vAcc = GetULong(messageBuffer, 24)	   // vAcc
+		.lon = getILong(messageBuffer, 4),	   // lon
+		.lat = getILong(messageBuffer, 8),	   // lat
+		.height = getILong(messageBuffer, 12), // height
+		.hMSL = getILong(messageBuffer, 16),   // hMSL
+		.hAcc = getULong(messageBuffer, 20),   // hAcc
+		.vAcc = getULong(messageBuffer, 24)	   // vAcc
 	};
 }
 
 /*!
  * Parse data to earth centric position solution standard.
  */
-PositionECEF GNSS::ParseNavPosECEF(uint8_t *messageBuffer)
+PositionECEF GNSSCore::parseNavPosECEF(uint8_t *messageBuffer)
 {
 	return PositionECEF{
-		.ecefX = GetILong(messageBuffer, 4),  // ecefX
-		.ecefY = GetILong(messageBuffer, 8),  // ecefY
-		.ecefZ = GetILong(messageBuffer, 12), // ecefZ
-		.pAcc = GetULong(messageBuffer, 16)	  // pAcc
+		.ecefX = getILong(messageBuffer, 4),  // ecefX
+		.ecefY = getILong(messageBuffer, 8),  // ecefY
+		.ecefZ = getILong(messageBuffer, 12), // ecefZ
+		.pAcc = getULong(messageBuffer, 16)	  // pAcc
 	};
 }
 
 /*!
  * Parse data to geodetic velocity solution standard.
  */
-VelocityNED GNSS::ParseNavVelNED(uint8_t *messageBuffer)
+VelocityNED GNSSCore::parseNavVelNED(uint8_t *messageBuffer)
 {
 	return VelocityNED{
-		.velN = GetILong(messageBuffer, 4),		// velN
-		.velE = GetILong(messageBuffer, 8),		// velE
-		.velD = GetILong(messageBuffer, 12),	// velD
-		.headMot = GetILong(messageBuffer, 24), // headMot
-		.speed = GetULong(messageBuffer, 16),	// gSpeed
-		.gSpeed = GetULong(messageBuffer, 20),	// gSpeed
-		.sAcc = GetULong(messageBuffer, 28),	// sAcc
-		.headAcc = GetULong(messageBuffer, 32)	// headAcc
+		.velN = getILong(messageBuffer, 4),		// velN
+		.velE = getILong(messageBuffer, 8),		// velE
+		.velD = getILong(messageBuffer, 12),	// velD
+		.headMot = getILong(messageBuffer, 24), // headMot
+		.speed = getULong(messageBuffer, 16),	// gSpeed
+		.gSpeed = getULong(messageBuffer, 20),	// gSpeed
+		.sAcc = getULong(messageBuffer, 28),	// sAcc
+		.headAcc = getULong(messageBuffer, 32)	// headAcc
 	};
 }
 
 /*!
  * Parse data to earth centric velocity solution standard.
  */
-VelocityECEF GNSS::ParseNavVelECEF(uint8_t *messageBuffer)
+VelocityECEF GNSSCore::parseNavVelECEF(uint8_t *messageBuffer)
 {
 	return VelocityECEF{
-		.ecefVX = GetILong(messageBuffer, 4),  // velX
-		.ecefVY = GetILong(messageBuffer, 8),  // velY
-		.ecefVZ = GetILong(messageBuffer, 12), // velZ
-		.sAcc = GetULong(messageBuffer, 16)	   // sAcc
+		.ecefVX = getILong(messageBuffer, 4),  // velX
+		.ecefVY = getILong(messageBuffer, 8),  // velY
+		.ecefVZ = getILong(messageBuffer, 12), // velZ
+		.sAcc = getULong(messageBuffer, 16)	   // sAcc
 	};
 }
 
 /*!
  *  Sends the basic configuration: Activation of the UBX standard, change of NMEA version to 4.10 and turn on of the Galileo system.
  */
-void GNSS::LoadConfig()
+void GNSS::loadConfig()
 {
-	HAL_UART_Transmit_DMA(huart, const_cast<uint8_t *>(configUBX), sizeof(configUBX));
+	HAL_UART_Transmit_DMA(huart, const_cast<uint8_t *>(CONFIG_UBX), sizeof(CONFIG_UBX));
 	HAL_Delay(250);
-	HAL_UART_Transmit_DMA(huart, const_cast<uint8_t *>(setNMEA410), sizeof(setNMEA410));
+	HAL_UART_Transmit_DMA(huart, const_cast<uint8_t *>(SET_NMEA_410), sizeof(SET_NMEA_410));
 	HAL_Delay(250);
-	HAL_UART_Transmit_DMA(huart, const_cast<uint8_t *>(setGNSS), sizeof(setGNSS));
+	HAL_UART_Transmit_DMA(huart, const_cast<uint8_t *>(SET_GNSS), sizeof(SET_GNSS));
 	HAL_Delay(250);
 }
 
 /*!
  *  Creates a checksum based on UBX standard.
  */
-void GNSS::Checksum(uint16_t length, const uint8_t *payload, uint8_t *cka, uint8_t *ckb)
+void GNSSCore::checksum(uint16_t length, const uint8_t *payload, uint8_t *cka, uint8_t *ckb)
 {
 	uint8_t cka_ = 0;
 	uint8_t ckb_ = 0;
@@ -414,17 +401,17 @@ void GNSS::Checksum(uint16_t length, const uint8_t *payload, uint8_t *cka, uint8
 	*ckb = ckb_;
 }
 
-uint8_t GNSS::GetUByte(const uint8_t *messageBuffer, uint16_t offset)
+uint8_t GNSSCore::getUByte(const uint8_t *messageBuffer, uint16_t offset)
 {
 	return static_cast<uint8_t>(messageBuffer[offset]);
 }
 
-int8_t GNSS::GetIByte(const uint8_t *messageBuffer, uint16_t offset)
+int8_t GNSSCore::getIByte(const uint8_t *messageBuffer, uint16_t offset)
 {
 	return static_cast<int8_t>(messageBuffer[offset]);
 }
 
-uint16_t GNSS::GetUShort(const uint8_t *messageBuffer, uint16_t offset)
+uint16_t GNSSCore::getUShort(const uint8_t *messageBuffer, uint16_t offset)
 {
 	for (uint16_t var = 0; var < 2; ++var)
 	{
@@ -433,7 +420,7 @@ uint16_t GNSS::GetUShort(const uint8_t *messageBuffer, uint16_t offset)
 	return uShort.uShort;
 }
 
-int16_t GNSS::GetIShort(const uint8_t *messageBuffer, uint16_t offset)
+int16_t GNSSCore::getIShort(const uint8_t *messageBuffer, uint16_t offset)
 {
 	for (uint16_t var = 0; var < 2; ++var)
 	{
@@ -442,7 +429,7 @@ int16_t GNSS::GetIShort(const uint8_t *messageBuffer, uint16_t offset)
 	return iShort.iShort;
 }
 
-uint32_t GNSS::GetULong(const uint8_t *messageBuffer, uint16_t offset)
+uint32_t GNSSCore::getULong(const uint8_t *messageBuffer, uint16_t offset)
 {
 	for (uint16_t var = 0; var < 4; ++var)
 	{
@@ -451,7 +438,7 @@ uint32_t GNSS::GetULong(const uint8_t *messageBuffer, uint16_t offset)
 	return uLong.uLong;
 }
 
-int32_t GNSS::GetILong(const uint8_t *messageBuffer, uint16_t offset)
+int32_t GNSSCore::getILong(const uint8_t *messageBuffer, uint16_t offset)
 {
 	for (uint16_t var = 0; var < 4; ++var)
 	{
@@ -462,7 +449,7 @@ int32_t GNSS::GetILong(const uint8_t *messageBuffer, uint16_t offset)
 
 PositionECEF_AU ConvertPositionECEF(const PositionECEF &pos)
 {
-	return PositionECEF_AU {
+	return PositionECEF_AU{
 		.x = au::make_quantity<au::Centi<au::MetersInEcefFrame>>(static_cast<float>(pos.ecefX)),
 		.y = au::make_quantity<au::Centi<au::MetersInEcefFrame>>(static_cast<float>(pos.ecefY)),
 		.z = au::make_quantity<au::Centi<au::MetersInEcefFrame>>(static_cast<float>(pos.ecefZ)),
@@ -471,10 +458,9 @@ PositionECEF_AU ConvertPositionECEF(const PositionECEF &pos)
 
 VelocityECEF_AU ConvertVelocityECEF(const VelocityECEF &vel)
 {
-	return VelocityECEF_AU {
+	return VelocityECEF_AU{
 		.x = au::make_quantity<au::Centi<au::MetersPerSecondInEcefFrame>>(static_cast<float>(vel.ecefVX)),
 		.y = au::make_quantity<au::Centi<au::MetersPerSecondInEcefFrame>>(static_cast<float>(vel.ecefVY)),
 		.z = au::make_quantity<au::Centi<au::MetersPerSecondInEcefFrame>>(static_cast<float>(vel.ecefVZ)),
 		.acc = au::make_quantity<au::Centi<au::MetersPerSecondInEcefFrame>>(static_cast<float>(vel.sAcc))};
 }
-

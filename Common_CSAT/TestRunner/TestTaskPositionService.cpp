@@ -30,7 +30,7 @@ public:
         has_data = true;
     }
 
-    std::optional<PositionECEF> GetNavPosECEF()
+    std::optional<PositionECEF> getNavPosECEF()
     {
         if (has_data)
         {

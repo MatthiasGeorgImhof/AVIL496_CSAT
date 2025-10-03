@@ -173,7 +173,7 @@ bool GNSSandAccelPosition<Tracker, GNSS, IMU>::predict(std::array<au::QuantityF<
 
     if (gnss_counter_ % gnss_rate_ == 0)
     {
-        auto optional_pos_ecef = gnss_.GetNavPosECEF();
+        auto optional_pos_ecef = gnss_.getNavPosECEF();
         if (optional_pos_ecef.has_value())
         {
             auto pos_ecef = ConvertPositionECEF(optional_pos_ecef.value());

@@ -6,7 +6,7 @@
 #include <vector>
 #include <cstring>
 
-TEST_CASE("GNSS GetNavPosECEF Trivial Test")
+TEST_CASE("GNSS getNavPosECEF Trivial Test")
 {
     UART_HandleTypeDef huart;
     init_uart_handle(&huart);
@@ -19,7 +19,7 @@ TEST_CASE("GNSS GetNavPosECEF Trivial Test")
         static_assert(sizeof(test_data) == 28);
         inject_uart_rx_data(test_data, sizeof(test_data));
 
-        std::optional<PositionECEF> navPosECEF = gnss.GetNavPosECEF();
+        std::optional<PositionECEF> navPosECEF = gnss.getNavPosECEF();
 
         REQUIRE(navPosECEF.has_value());
         CHECK(navPosECEF.value().ecefX == 0);
@@ -32,7 +32,7 @@ TEST_CASE("GNSS GetNavPosECEF Trivial Test")
     {
         uint8_t test_data[] = {0xB5, 0x62, 0x01, 0x01, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff};
         inject_uart_rx_data(test_data, sizeof(test_data));
-        std::optional<PositionECEF> navPosECEF = gnss.GetNavPosECEF();
+        std::optional<PositionECEF> navPosECEF = gnss.getNavPosECEF();
         CHECK(!navPosECEF.has_value());
     }
 
@@ -40,7 +40,7 @@ TEST_CASE("GNSS GetNavPosECEF Trivial Test")
     {
         uint8_t test_data[] = {0xB5, 0x62, 0x02, 0x01, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}; // Wrong ClassID
         inject_uart_rx_data(test_data, sizeof(test_data));
-        std::optional<PositionECEF> navPosECEF = gnss.GetNavPosECEF();
+        std::optional<PositionECEF> navPosECEF = gnss.getNavPosECEF();
         CHECK(!navPosECEF.has_value());
     }
 
@@ -48,12 +48,12 @@ TEST_CASE("GNSS GetNavPosECEF Trivial Test")
     {
         uint8_t test_data[] = {0xB5, 0x62, 0x01, 0x01, 0x04, 0x00, 0x00, 0x00}; // Truncated Data
         inject_uart_rx_data(test_data, sizeof(test_data));
-        std::optional<PositionECEF> navPosECEF = gnss.GetNavPosECEF();
+        std::optional<PositionECEF> navPosECEF = gnss.getNavPosECEF();
         CHECK(!navPosECEF.has_value());
     }
 }
 
-TEST_CASE("GNSS GetNavVelNED Trivial Test")
+TEST_CASE("GNSS getNavVelNED Trivial Test")
 {
     UART_HandleTypeDef huart;
     init_uart_handle(&huart);
@@ -66,7 +66,7 @@ TEST_CASE("GNSS GetNavVelNED Trivial Test")
         static_assert(sizeof(test_data) == 44);
         inject_uart_rx_data(test_data, sizeof(test_data));
 
-        std::optional<VelocityNED> navVelNED = gnss.GetNavVelNED();
+        std::optional<VelocityNED> navVelNED = gnss.getNavVelNED();
 
         REQUIRE(navVelNED.has_value());
         CHECK(navVelNED.value().velN == 0);
@@ -79,7 +79,7 @@ TEST_CASE("GNSS GetNavVelNED Trivial Test")
     }
 }
 
-TEST_CASE("GNSS GetNavVelECEF Trivial Test")
+TEST_CASE("GNSS getNavVelECEF Trivial Test")
 {
     UART_HandleTypeDef huart;
     init_uart_handle(&huart);
@@ -92,7 +92,7 @@ TEST_CASE("GNSS GetNavVelECEF Trivial Test")
         static_assert(sizeof(test_data) == 28);
         inject_uart_rx_data(test_data, sizeof(test_data));
 
-        std::optional<VelocityECEF> navVelECEF = gnss.GetNavVelECEF();
+        std::optional<VelocityECEF> navVelECEF = gnss.getNavVelECEF();
 
         REQUIRE(navVelECEF.has_value());
         CHECK(navVelECEF.value().ecefVX == 0);
@@ -125,7 +125,7 @@ TEST_CASE("GNSS getUniqID Test")
     CHECK(uniqueID.value().id[5] == 0x06);
 }
 
-TEST_CASE("GNSS GetNavPVT Test")
+TEST_CASE("GNSS getNavPVT Test")
 {
     UART_HandleTypeDef huart;
     init_uart_handle(&huart);
@@ -146,7 +146,7 @@ TEST_CASE("GNSS GetNavPVT Test")
     static_assert(ValidateChecksum(test_data));
     inject_uart_rx_data(const_cast<uint8_t *>(test_data), sizeof(test_data));
 
-    std::optional<NavigationPVT> navPVT = gnss.GetNavPVT();
+    std::optional<NavigationPVT> navPVT = gnss.getNavPVT();
 
     REQUIRE(navPVT.has_value());
     CHECK(navPVT.value().utcTime.year == 2025);
@@ -175,7 +175,7 @@ TEST_CASE("GNSS GetNavPVT Test")
     CHECK(navPVT.value().velocity.headAcc == 3072205);
 }
 
-TEST_CASE("GNSS GetNavPosLLH Test")
+TEST_CASE("GNSS getNavPosLLH Test")
 {
     UART_HandleTypeDef huart;
     init_uart_handle(&huart);
@@ -188,7 +188,7 @@ TEST_CASE("GNSS GetNavPosLLH Test")
     static_assert(ValidateChecksum(test_data));
     inject_uart_rx_data(const_cast<uint8_t *>(test_data), sizeof(test_data));
 
-    std::optional<PositionLLH> navPos = gnss.GetNavPosLLH();
+    std::optional<PositionLLH> navPos = gnss.getNavPosLLH();
 
     REQUIRE(navPos.has_value());
     CHECK(navPos.value().lon == 26);
@@ -199,7 +199,7 @@ TEST_CASE("GNSS GetNavPosLLH Test")
     CHECK(navPos.value().vAcc == 0);
 }
 
-TEST_CASE("GNSS GetNavTimeUTC Test")
+TEST_CASE("GNSS getNavTimeUTC Test")
 {
     UART_HandleTypeDef huart;
     init_uart_handle(&huart);
@@ -212,7 +212,7 @@ TEST_CASE("GNSS GetNavTimeUTC Test")
     static_assert(ValidateChecksum(test_data));
     inject_uart_rx_data(const_cast<uint8_t *>(test_data), sizeof(test_data));
 
-    std::optional<UTCTime> utcTime = gnss.GetNavTimeUTC();
+    std::optional<UTCTime> utcTime = gnss.getNavTimeUTC();
 
     REQUIRE(utcTime.has_value());
     CHECK(utcTime.value().year == 2024);

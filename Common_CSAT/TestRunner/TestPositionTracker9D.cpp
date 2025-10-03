@@ -246,7 +246,7 @@ public:
         pos_ = pos_cm;
     }
 
-    std::optional<PositionECEF> GetNavPosECEF() const
+    std::optional<PositionECEF> getNavPosECEF() const
     {
         return pos_;
     }

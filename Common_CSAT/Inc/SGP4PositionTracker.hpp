@@ -94,7 +94,7 @@ bool SGP4andGNSSandPosition<Tracker, SGP4, GNSS>::predict(std::array<au::Quantit
 
     if (gnss_counter_ % gnss_rate_ == 0)
     {
-        auto optional_pos_ecef = gnss_.GetNavPosECEF();
+        auto optional_pos_ecef = gnss_.getNavPosECEF();
         if (optional_pos_ecef.has_value())
         {
             auto pos_ecef = ConvertPositionECEF(optional_pos_ecef.value());

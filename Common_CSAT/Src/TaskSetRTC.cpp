@@ -28,7 +28,7 @@ void TaskSetRTC::unregisterTask(RegistrationManager *manager, std::shared_ptr<Ta
 void TaskSetRTC::handleTaskImpl()
 {
     {
-        std::optional<UTCTime> utctime = gnss_.GetNavTimeUTC();
+        std::optional<UTCTime> utctime = gnss_.getNavTimeUTC();
         if (!utctime.has_value())
         {
             return;
