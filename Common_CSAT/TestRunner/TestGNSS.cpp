@@ -271,3 +271,44 @@ TEST_CASE("VelocityECEF_AU ConvertVelocityECEF(const VelocityECEF &neg")
 
 
 
+TEST_CASE("SimulatedGNSS getNavPosECEF Test")
+{
+    constexpr int32_t error_meters = 100;
+    SimulatedGNSS gnss(error_meters);
+
+    constexpr int32_t baseX = -1489000 * 100;
+    constexpr int32_t baseY = -4743000 * 100;
+    constexpr int32_t baseZ = 3980000 * 100;
+    constexpr int32_t max_error = error_meters * 100;
+
+    SUBCASE("Position within error bounds")
+    {
+        std::optional<PositionECEF> pos = gnss.getNavPosECEF();
+        REQUIRE(pos.has_value());
+
+        CHECK(pos->ecefX >= baseX - max_error);
+        CHECK(pos->ecefX <= baseX + max_error);
+
+        CHECK(pos->ecefY >= baseY - max_error);
+        CHECK(pos->ecefY <= baseY + max_error);
+
+        CHECK(pos->ecefZ >= baseZ - max_error);
+        CHECK(pos->ecefZ <= baseZ + max_error);
+
+        CHECK(pos->pAcc == 10000); // 100 meters in centimeters
+    }
+
+        SUBCASE("Position had added noise")
+    {
+        std::optional<PositionECEF> pos1 = gnss.getNavPosECEF();
+        std::optional<PositionECEF> pos2 = gnss.getNavPosECEF();
+        REQUIRE(pos1.has_value());
+        REQUIRE(pos2.has_value());
+
+        CHECK(pos1->ecefX != pos2->ecefX);
+        CHECK(pos1->ecefY != pos2->ecefY);
+        CHECK(pos1->ecefZ != pos2->ecefZ);
+        CHECK(pos1->pAcc == pos2->pAcc);
+    }
+
+}
