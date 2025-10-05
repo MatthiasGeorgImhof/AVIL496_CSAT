@@ -7,6 +7,7 @@
 #include "TimeUtils.hpp"
 #include "GNSS.hpp"
 #include "IMU.hpp"
+#include "IMUExtension.hpp"
 #ifdef __arm__
 #include "usbd_cdc_if.h"
 #endif
@@ -14,32 +15,32 @@
 #include "mock_hal.h"
 #endif
 
-constexpr float m_pif = static_cast<float>(std::numbers::pi);
-constexpr float DEG_TO_RAD = m_pif / 180.0f; // Conversion factor from degrees to radians
-constexpr float RAD_TO_DEG = 180.0f / m_pif; // Conversion factor from radians to degrees
-
-inline Eigen::Vector3f rotateNEDtoECEF(const Eigen::Vector3f &ned_vector, float lat_deg, float lon_deg)
+Eigen::Matrix3f computeNEDtoECEFRotation(au::QuantityF<au::RadiansInGeodeticFrame> latitude, au::QuantityF<au::RadiansInGeodeticFrame> longitude)
 {
-    float lat = lat_deg * DEG_TO_RAD;
-    float lon = lon_deg * DEG_TO_RAD;
+    float lat = latitude.in(au::radiansInGeodeticFrame);
+    float lon = longitude.in(au::radiansInGeodeticFrame);
 
-    float sin_lat = sinf(lat);
-    float cos_lat = cosf(lat);
-    float sin_lon = sinf(lon);
-    float cos_lon = cosf(lon);
+    float sin_lat = std::sin(lat);
+    float cos_lat = std::cos(lat);
+    float sin_lon = std::sin(lon);
+    float cos_lon = std::cos(lon);
 
-    // Columns represent NED axes expressed in ECEF
-    Eigen::Matrix3f R_ecef_from_ned;
-    R_ecef_from_ned.col(0) << -sin_lat * cos_lon, -sin_lat * sin_lon, cos_lat;  // North
-    R_ecef_from_ned.col(1) << -sin_lon, cos_lon, 0.f;                           // East
-    R_ecef_from_ned.col(2) << -cos_lat * cos_lon, -cos_lat * sin_lon, -sin_lat; // Down
+    // NED to ECEF rotation matrix
+    Eigen::Matrix3f R;
+    R << -sin_lat * cos_lon, -sin_lon, -cos_lat * cos_lon,
+        -sin_lat * sin_lon, cos_lon, -cos_lat * sin_lon,
+        cos_lat, 0.f, -sin_lat;
 
-    return R_ecef_from_ned * ned_vector;
+    return R;
 }
 
-inline Eigen::Vector3f rotateNEDtoECEF(const Eigen::Vector3f &ned_vector, const coordinate_transformations::Geodetic &geo)
+Eigen::Matrix3f computeNEDtoECEFRotation(std::array<au::QuantityF<au::MetersInEcefFrame>, 3> &ecef)
 {
-    return rotateNEDtoECEF(ned_vector, geo.latitude.in(au::degreesInGeodeticFrame), geo.longitude.in(au::degreesInGeodeticFrame));
+    // Convert ECEF to geodetic (lat, lon)
+    coordinate_transformations::ECEF ecef_ = {ecef[0], ecef[1], ecef[2]};
+    coordinate_transformations::Geodetic geo = coordinate_transformations::ecefToGeodetic(ecef_);
+
+    return computeNEDtoECEFRotation(geo.latitude, geo.longitude);
 }
 
 class PositionTracker9D
@@ -77,7 +78,7 @@ public:
         // accelKF.update(H_acc, accel);
         // kf.stateVector = accelKF.stateVector;
         // kf.stateCovarianceMatrix = accelKF.stateCovarianceMatrix;
-        
+
         kf.update(H_acc, accel);
 
         // std::cerr << "timestamp_sec: " << timestamp_sec << ", A:\n" << A << "\n";
@@ -90,12 +91,21 @@ public:
         kf.update(H_gps, gps);
         // std::cerr << "timestamp_sec: " << timestamp_sec << ", A:\n" << A << "\n";
         // std::cerr << "State end of updateWithGps:\n" << kf.getState().transpose() << "\n";
-
     }
 
     StateVector getState() const
     {
         return kf.getState();
+    }
+
+    void setState(const StateVector &newState)
+    {
+        kf.setState(newState);
+    }
+
+    void injectGpsWithoutPrediction(const Eigen::Vector3f &gps)
+    {
+        kf.update(H_gps, gps);
     }
 
 protected:
@@ -126,7 +136,7 @@ protected:
         }
         // std::cerr << "dt: " << dt << ", A:\n" << A << "\n";
         // std::cerr << "State end of updateTransitionMatrix:\n" << kf.getState().transpose() << "\n";
-}
+    }
 
 protected:
     au::QuantityU64<au::Milli<au::Seconds>> last_timestamp;
@@ -138,22 +148,25 @@ protected:
     KalmanFilter<StateSize, PosMeasSize> kf;
 };
 
-template <typename Tracker, typename GNSS, typename IMU>
-requires(HasEcefAccelerometer<IMU>)
+template < typename PositionTracker, typename GNSS, typename IMU, typename OrientationProvider, typename GravityPolicy = NoGravityCompensation>
+requires(HasBodyAccelerometer<IMU>)
 class GNSSandAccelPosition
 {
 public:
     GNSSandAccelPosition() = delete;
 
-    GNSSandAccelPosition(RTC_HandleTypeDef *hrtc, Tracker &tracker, GNSS &gnss, IMU &imu, uint16_t gnss_rate = 1, uint16_t imu_rate = 1) : hrtc_(hrtc), tracker_(tracker), gnss_(gnss), imu_(imu), gnss_rate_(gnss_rate), imu_rate_(imu_rate), gnss_counter_(0U), imu_counter_(0) {}
+    GNSSandAccelPosition(RTC_HandleTypeDef *hrtc, PositionTracker &tracker, GNSS &gnss, IMU &imu, OrientationProvider &orientation, uint16_t gnss_rate = 1, uint16_t imu_rate = 1) : hrtc_(hrtc), tracker_(tracker), gnss_(gnss), orientation_(orientation), ecef_imu_(imu, orientation, tracker), gnss_rate_(gnss_rate), imu_rate_(imu_rate), gnss_counter_(0U), imu_counter_(0)
+    {
+    }
 
     bool predict(std::array<au::QuantityF<au::MetersInEcefFrame>, 3> &r, std::array<au::QuantityF<au::MetersPerSecondInEcefFrame>, 3> &v, au::QuantityU64<au::Milli<au::Seconds>> &timestamp);
 
 private:
     RTC_HandleTypeDef *hrtc_;
-    Tracker &tracker_;
+    PositionTracker &tracker_;
     GNSS &gnss_;
-    IMU &imu_;
+    OrientationProvider &orientation_;
+    IMUAccInECEFWithPolicy<IMU, OrientationProvider, PositionTracker, GravityPolicy> ecef_imu_;
 
     uint16_t gnss_rate_;
     uint16_t imu_rate_;
@@ -162,9 +175,9 @@ private:
     uint16_t imu_counter_;
 };
 
-template <typename Tracker, typename GNSS, typename IMU>
-requires(HasEcefAccelerometer<IMU>)
-bool GNSSandAccelPosition<Tracker, GNSS, IMU>::predict(std::array<au::QuantityF<au::MetersInEcefFrame>, 3> &r, std::array<au::QuantityF<au::MetersPerSecondInEcefFrame>, 3> &v, au::QuantityU64<au::Milli<au::Seconds>> &timestamp)
+template < typename PositionTracker, typename GNSS, typename IMU, typename OrientationProvider, typename GravityPolicy>
+    requires(HasBodyAccelerometer<IMU>)
+bool GNSSandAccelPosition<PositionTracker, GNSS, IMU, OrientationProvider, GravityPolicy>::predict(std::array<au::QuantityF<au::MetersInEcefFrame>, 3> &r, std::array<au::QuantityF<au::MetersPerSecondInEcefFrame>, 3> &v, au::QuantityU64<au::Milli<au::Seconds>> &timestamp)
 {
     TimeUtils::RTCDateTimeSubseconds rtc;
     HAL_RTC_GetTime(hrtc_, &rtc.time, RTC_FORMAT_BIN);
@@ -177,6 +190,11 @@ bool GNSSandAccelPosition<Tracker, GNSS, IMU>::predict(std::array<au::QuantityF<
         if (optional_pos_ecef.has_value())
         {
             auto pos_ecef = ConvertPositionECEF(optional_pos_ecef.value());
+            // std::cerr << "[GNSS injection] "
+            //           << pos_ecef.x.in(au::metersInEcefFrame) << ", "
+            //           << pos_ecef.y.in(au::metersInEcefFrame) << ", "
+            //           << pos_ecef.z.in(au::metersInEcefFrame) << "\n";
+
             tracker_.updateWithGps(Eigen::Vector3f(pos_ecef.x.in(au::metersInEcefFrame), pos_ecef.y.in(au::metersInEcefFrame), pos_ecef.z.in(au::metersInEcefFrame)), timestamp);
         }
     }
@@ -185,7 +203,7 @@ bool GNSSandAccelPosition<Tracker, GNSS, IMU>::predict(std::array<au::QuantityF<
 
     if (imu_counter_ % imu_rate_ == 0)
     {
-        auto optional_accel = imu_.readAccelerometer();
+        auto optional_accel = ecef_imu_.readAccelerometer();
         if (optional_accel.has_value())
         {
             auto accel = optional_accel.value();
@@ -198,7 +216,7 @@ bool GNSSandAccelPosition<Tracker, GNSS, IMU>::predict(std::array<au::QuantityF<
     // std::cerr << "[IMU] timestamp_sec = " << timestamp_sec.in(au::seconds) << std::endl;
 
     auto state = tracker_.getState();
-    // std::cerr << "[Tracker] pos.z = " << state[2] << ", vel.z = " << state[5] << std::endl;
+    // std::cerr << "[PositionTracker] pos.z = " << state[2] << ", vel.z = " << state[5] << std::endl;
 
     std::transform(state.data(), state.data() + 3, r.begin(), [](const auto &item)
                    { return au::make_quantity<au::MetersInEcefFrame>(item); });
@@ -209,4 +227,3 @@ bool GNSSandAccelPosition<Tracker, GNSS, IMU>::predict(std::array<au::QuantityF<
     ++imu_counter_;
     return true;
 }
-
