@@ -48,6 +48,10 @@
 #include "OrientationTracker.hpp"
 #include "OrientationService.hpp"
 #include "TaskOrientationService.hpp"
+#include "PositionTracker9D.hpp"
+#include "TaskPositionService.hpp"
+#include "GNSS.hpp"
+
 
 #include "au.hh"
 #include "au.hpp"
@@ -246,15 +250,26 @@ void cppmain()
 //    MR25H10<MramTransport> mram(mram_transport);
 //    (void) mag.readChipID();
 
-	using TrackerType = AccGyrMagOrientationTracker<7,6>;
+	using OrientationTrackerType = AccGyrMagOrientationTracker<7,6>;
 	using IMUType = BMI270_MMC5983<SPITransport<IMUConfigType>>;
-	using OrientationType = AccGyrMagOrientation<TrackerType, IMUType, IMUType>;
+	using OrientationType = AccGyrMagOrientation<OrientationTrackerType, IMUType, IMUType>;
 	using OrientationTask = TaskOrientationService<OrientationType, Cyphal<CanardAdapter>>;
-	TrackerType tracker;
-	OrientationType orientation(&hrtc, tracker, imu, imu);
+	OrientationTrackerType orientation_tracker;
+	OrientationType orientation(&hrtc, orientation_tracker, imu, imu);
 	O1HeapAllocator<OrientationTask> alloc_TaskOrientationService(o1heap);
 	registration_manager.add(
 	    allocate_unique_custom<OrientationTask>(alloc_TaskOrientationService, orientation, 100, 5, 0, canard_adapters)
+	);
+
+	using PositionTrackerType = PositionTracker9D;
+	using PositionType = GNSSandAccelPosition<PositionTrackerType, SimulatedGNSS, IMUType, OrientationType, SubtractGravityInNED>;
+	using PositionTask = TaskPositionService<PositionType, Cyphal<CanardAdapter>>;
+	SimulatedGNSS gnss(25);
+	PositionTrackerType position_tracker;
+	PositionType Position(&hrtc, position_tracker, gnss, imu, orientation, 100, 1);
+	O1HeapAllocator<PositionTask> alloc_TaskPositionService(o1heap);
+	registration_manager.add(
+	    allocate_unique_custom<PositionTask>(alloc_TaskPositionService, Position, 100, 5, 0, canard_adapters)
 	);
 
 	subscription_manager.subscribe<SubscriptionManager::MessageTag>(registration_manager.getSubscriptions(), canard_adapters);
@@ -293,7 +308,7 @@ void cppmain()
 //		auto imu_gyr = imu.readGyroscope();
 //		auto imu_tmp = imu.readThermometer();
 //		auto imu_mag = imu.readMagnetometer();
-//
+
 ////		auto mag_chip = mag.readChipID();
 ////		auto mag_tmp = mag.readRawThermometer();
 //		auto mag_mag = mag.readMagnetometer();

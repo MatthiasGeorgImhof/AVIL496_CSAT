@@ -45,6 +45,8 @@ void TaskPositionService<Tracker, Adapters...>::handleTaskImpl()
     std::transform(std::begin(r), std::end(r), std::begin(data.position_m), [](const auto &item) { return item.in(au::meters * au::ecefs); });
     std::transform(std::begin(v), std::end(v), std::begin(data.velocity_ms), [](const auto &item) { return item.in(au::meters * au::ecefs / au::second); });
 
+    log(LOG_LEVEL_DEBUG, "TaskPositionService %f %f %f\r\n", r[0].in(au::metersInEcefFrame), r[1].in(au::metersInEcefFrame), r[2].in(au::metersInEcefFrame));
+
     constexpr size_t PAYLOAD_SIZE = _4111spyglass_sat_model_PositionVelocity_0_1_SERIALIZATION_BUFFER_SIZE_BYTES_;
     uint8_t payload[PAYLOAD_SIZE];
 
