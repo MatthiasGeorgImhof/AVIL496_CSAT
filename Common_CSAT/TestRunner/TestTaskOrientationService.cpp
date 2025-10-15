@@ -145,14 +145,14 @@ TEST_CASE("TaskOrientationService Test with GyrMagOrientation")
         REQUIRE(loopard.buffer.size() == 1);
 
         auto transfer = loopard.buffer.pop();
-        CHECK(transfer.metadata.port_id == _uavcan_si_sample_angle_Quaternion_1_0_PORT_ID_);
+        CHECK(transfer.metadata.port_id == _4111spyglass_sat_solution_OrientationSolution_0_1_PORT_ID_);
         CHECK(transfer.metadata.transfer_kind == CyphalTransferKindMessage);
         CHECK(transfer.metadata.remote_node_id == id);
-        CHECK(transfer.payload_size == uavcan_si_sample_angle_Quaternion_1_0_SERIALIZATION_BUFFER_SIZE_BYTES_);
+        CHECK(transfer.payload_size == _4111spyglass_sat_solution_OrientationSolution_0_1_SERIALIZATION_BUFFER_SIZE_BYTES_);
 
-        uavcan_si_sample_angle_Quaternion_1_0 received_data;
+        _4111spyglass_sat_solution_OrientationSolution_0_1 received_data;
         size_t deserialized_size = transfer.payload_size;
-        int8_t deserialization_result = uavcan_si_sample_angle_Quaternion_1_0_deserialize_(&received_data, static_cast<const uint8_t *>(transfer.payload), &deserialized_size);
+        int8_t deserialization_result = _4111spyglass_sat_solution_OrientationSolution_0_1_deserialize_(&received_data, static_cast<const uint8_t *>(transfer.payload), &deserialized_size);
         REQUIRE(deserialization_result >= 0);
 
         Eigen::Quaternionf current_orientation = tracker.getOrientation();
@@ -164,10 +164,10 @@ TEST_CASE("TaskOrientationService Test with GyrMagOrientation")
         if (i > 50)
         {
             CHECK(received_data.timestamp.microsecond == duration.count() * 1000);
-            CHECK(received_data.wxyz[0] == doctest::Approx(qw).epsilon(0.1f));
-            CHECK(received_data.wxyz[1] == doctest::Approx(qx).epsilon(0.1f));
-            CHECK(received_data.wxyz[2] == doctest::Approx(qy).epsilon(0.1f));
-            CHECK(received_data.wxyz[3] == doctest::Approx(qz).epsilon(0.1f));
+            CHECK(received_data.quaternion_ned.wxyz[0] == doctest::Approx(qw).epsilon(0.1f));
+            CHECK(received_data.quaternion_ned.wxyz[1] == doctest::Approx(qx).epsilon(0.1f));
+            CHECK(received_data.quaternion_ned.wxyz[2] == doctest::Approx(qy).epsilon(0.1f));
+            CHECK(received_data.quaternion_ned.wxyz[3] == doctest::Approx(qz).epsilon(0.1f));
         }
         duration += dduration;
         auto rtc = TimeUtils::to_rtc(duration, secondFraction);
@@ -215,21 +215,21 @@ TEST_CASE("TaskOrientationService Test with AccGyrOrientation")
         REQUIRE(loopard.buffer.size() == 1);
 
         auto transfer = loopard.buffer.pop();
-        CHECK(transfer.metadata.port_id == _uavcan_si_sample_angle_Quaternion_1_0_PORT_ID_);
+        CHECK(transfer.metadata.port_id == _4111spyglass_sat_solution_OrientationSolution_0_1_PORT_ID_);
         CHECK(transfer.metadata.remote_node_id == id);
 
-        uavcan_si_sample_angle_Quaternion_1_0 received_data;
+        _4111spyglass_sat_solution_OrientationSolution_0_1 received_data;
         size_t deserialized_size = transfer.payload_size;
-        int8_t result = uavcan_si_sample_angle_Quaternion_1_0_deserialize_(&received_data, static_cast<const uint8_t *>(transfer.payload), &deserialized_size);
+        int8_t result = _4111spyglass_sat_solution_OrientationSolution_0_1_deserialize_(&received_data, static_cast<const uint8_t *>(transfer.payload), &deserialized_size);
         REQUIRE(result >= 0);
 
         Eigen::Quaternionf q = tracker.getOrientation();
         if (i > 50)
         {
-            CHECK(received_data.wxyz[0] == doctest::Approx(q.w()).epsilon(0.1f));
-            CHECK(received_data.wxyz[1] == doctest::Approx(q.x()).epsilon(0.1f));
-            CHECK(received_data.wxyz[2] == doctest::Approx(q.y()).epsilon(0.1f));
-            CHECK(received_data.wxyz[3] == doctest::Approx(q.z()).epsilon(0.1f));
+            CHECK(received_data.quaternion_ned.wxyz[0] == doctest::Approx(q.w()).epsilon(0.1f));
+            CHECK(received_data.quaternion_ned.wxyz[1] == doctest::Approx(q.x()).epsilon(0.1f));
+            CHECK(received_data.quaternion_ned.wxyz[2] == doctest::Approx(q.y()).epsilon(0.1f));
+            CHECK(received_data.quaternion_ned.wxyz[3] == doctest::Approx(q.z()).epsilon(0.1f));
         }
 
         duration += dduration;
@@ -280,21 +280,21 @@ TEST_CASE("TaskOrientationService Test with AccGyrMagOrientation")
         REQUIRE(loopard.buffer.size() == 1);
 
         auto transfer = loopard.buffer.pop();
-        CHECK(transfer.metadata.port_id == _uavcan_si_sample_angle_Quaternion_1_0_PORT_ID_);
+        CHECK(transfer.metadata.port_id == _4111spyglass_sat_solution_OrientationSolution_0_1_PORT_ID_);
         CHECK(transfer.metadata.remote_node_id == id);
 
-        uavcan_si_sample_angle_Quaternion_1_0 received_data;
+        _4111spyglass_sat_solution_OrientationSolution_0_1 received_data;
         size_t deserialized_size = transfer.payload_size;
-        int8_t result = uavcan_si_sample_angle_Quaternion_1_0_deserialize_(&received_data, static_cast<const uint8_t *>(transfer.payload), &deserialized_size);
+        int8_t result = _4111spyglass_sat_solution_OrientationSolution_0_1_deserialize_(&received_data, static_cast<const uint8_t *>(transfer.payload), &deserialized_size);
         REQUIRE(result >= 0);
 
         Eigen::Quaternionf q = tracker.getOrientation();
         if (i > 50)
         {
-            CHECK(received_data.wxyz[0] == doctest::Approx(q.w()).epsilon(0.1f));
-            CHECK(received_data.wxyz[1] == doctest::Approx(q.x()).epsilon(0.1f));
-            CHECK(received_data.wxyz[2] == doctest::Approx(q.y()).epsilon(0.1f));
-            CHECK(received_data.wxyz[3] == doctest::Approx(q.z()).epsilon(0.1f));
+            CHECK(received_data.quaternion_ned.wxyz[0] == doctest::Approx(q.w()).epsilon(0.1f));
+            CHECK(received_data.quaternion_ned.wxyz[1] == doctest::Approx(q.x()).epsilon(0.1f));
+            CHECK(received_data.quaternion_ned.wxyz[2] == doctest::Approx(q.y()).epsilon(0.1f));
+            CHECK(received_data.quaternion_ned.wxyz[3] == doctest::Approx(q.z()).epsilon(0.1f));
         }
 
         duration += dduration;

@@ -1,6 +1,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
 #include "IMUExtension.hpp"
+#include "coordinate_rotators.hpp"
 #include "au.hpp"
 
 #include <optional>

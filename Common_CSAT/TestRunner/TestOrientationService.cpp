@@ -154,3 +154,79 @@ TEST_CASE("AccGyrOrientation predicts identity quaternion with static inputs")
     REQUIRE(success);
     REQUIRE(std::abs(q[0] - 1.f) < 1e-3f);
 }
+
+TEST_CASE("GyrMagOrientation returns valid OrientationSolution with static inputs")
+{
+    GyrMagOrientationTracker tracker;
+    tracker.setReferenceVectors(Eigen::Vector3f(1.f, 0.f, 0.f));
+
+    RTC_HandleTypeDef rtc{};
+    rtc.Init.SynchPrediv = 255;
+
+    set_mocked_rtc_time({12, 0, 0, RTC_HOURFORMAT12_AM, 0, 255, RTC_DAYLIGHTSAVING_NONE, RTC_STOREOPERATION_RESET});
+    set_mocked_rtc_date({RTC_WEEKDAY_MONDAY, 1, 1, 24});
+
+    MockIMUinBodyFrame imu;
+    imu.setGyroscope(0.f, 0.f, 0.f);
+    imu.setMagnetometer(1.f, 0.f, 0.f);
+
+    GyrMagOrientation<GyrMagOrientationTracker<7,3>, MockIMUinBodyFrame, MockIMUinBodyFrame> service(&rtc, tracker, imu, imu);
+    OrientationSolution sol = service.predict();
+
+    REQUIRE(sol.has_valid(OrientationSolution::Validity::QUATERNION));
+    REQUIRE(sol.has_valid(OrientationSolution::Validity::ANGULAR_VELOCITY));
+    REQUIRE(sol.has_valid(OrientationSolution::Validity::MAGNETIC_FIELD));
+    REQUIRE(sol.has_valid(OrientationSolution::Validity::ORIENTATIONS));
+    REQUIRE(std::abs(sol.q[0] - 1.f) < 1e-3f);
+}
+
+TEST_CASE("AccGyrMagOrientation returns valid OrientationSolution with static inputs")
+{
+    AccGyrMagOrientationTracker tracker;
+    tracker.setReferenceVectors(Eigen::Vector3f(0.f, 0.f, 9.81f), Eigen::Vector3f(1.f, 0.f, 0.f));
+
+    RTC_HandleTypeDef rtc{};
+    rtc.Init.SynchPrediv = 255;
+
+    set_mocked_rtc_time({12, 0, 0, RTC_HOURFORMAT12_AM, 0, 255, RTC_DAYLIGHTSAVING_NONE, RTC_STOREOPERATION_RESET});
+    set_mocked_rtc_date({RTC_WEEKDAY_MONDAY, 1, 1, 24});
+
+    MockIMUinBodyFrame imu;
+    imu.setGyroscope(0.f, 0.f, 0.f);
+    imu.setAcceleration(0.f, 0.f, 9.81f);
+    imu.setMagnetometer(1.f, 0.f, 0.f);
+
+    AccGyrMagOrientation<AccGyrMagOrientationTracker<7,6>, MockIMUinBodyFrame, MockIMUinBodyFrame> service(&rtc, tracker, imu, imu);
+    OrientationSolution sol = service.predict();
+
+    REQUIRE(sol.has_valid(OrientationSolution::Validity::QUATERNION));
+    REQUIRE(sol.has_valid(OrientationSolution::Validity::ANGULAR_VELOCITY));
+    REQUIRE(sol.has_valid(OrientationSolution::Validity::MAGNETIC_FIELD));
+    REQUIRE(sol.has_valid(OrientationSolution::Validity::ORIENTATIONS));
+    REQUIRE(std::abs(sol.q[0] - 1.f) < 1e-3f);
+}
+
+TEST_CASE("AccGyrOrientation returns valid OrientationSolution with static inputs")
+{
+    AccGyrOrientationTracker tracker;
+    tracker.setReferenceVectors(Eigen::Vector3f(0.f, 0.f, 9.81f));
+
+    RTC_HandleTypeDef rtc{};
+    rtc.Init.SynchPrediv = 255;
+
+    set_mocked_rtc_time({12, 0, 0, RTC_HOURFORMAT12_AM, 0, 255, RTC_DAYLIGHTSAVING_NONE, RTC_STOREOPERATION_RESET});
+    set_mocked_rtc_date({RTC_WEEKDAY_MONDAY, 1, 1, 24});
+
+    MockIMUinBodyFrame imu;
+    imu.setGyroscope(0.f, 0.f, 0.f);
+    imu.setAcceleration(0.f, 0.f, 9.81f);
+
+    AccGyrOrientation<AccGyrOrientationTracker<7,3>, MockIMUinBodyFrame> service(&rtc, tracker, imu);
+    OrientationSolution sol = service.predict();
+
+    REQUIRE(sol.has_valid(OrientationSolution::Validity::QUATERNION));
+    REQUIRE(sol.has_valid(OrientationSolution::Validity::ANGULAR_VELOCITY));
+    REQUIRE(sol.has_valid(OrientationSolution::Validity::ORIENTATIONS));
+    REQUIRE_FALSE(sol.has_valid(OrientationSolution::Validity::MAGNETIC_FIELD));
+    REQUIRE(std::abs(sol.q[0] - 1.f) < 1e-3f);
+}

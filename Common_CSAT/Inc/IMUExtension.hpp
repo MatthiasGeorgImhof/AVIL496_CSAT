@@ -12,33 +12,7 @@
 #include "Eigen/Dense"
 #include "Eigen/Geometry"
 
-#include "coordinate_transformations.hpp"
-
-namespace imuextension
-{
-    Eigen::Matrix3f computeNEDtoECEFRotation(std::array<au::QuantityF<au::MetersInEcefFrame>, 3> &ecef)
-    {
-        // Convert ECEF to geodetic (lat, lon)
-        coordinate_transformations::ECEF ecef_ = {ecef[0], ecef[1], ecef[2]};
-        coordinate_transformations::Geodetic geo = coordinate_transformations::ecefToGeodetic(ecef_);
-
-        float lat = geo.latitude.in(au::radiansInGeodeticFrame);
-        float lon = geo.longitude.in(au::radiansInGeodeticFrame);
-
-        float sin_lat = std::sin(lat);
-        float cos_lat = std::cos(lat);
-        float sin_lon = std::sin(lon);
-        float cos_lon = std::cos(lon);
-
-        // NED to ECEF rotation matrix
-        Eigen::Matrix3f R;
-        R << -sin_lat * cos_lon, -sin_lon, -cos_lat * cos_lon,
-            -sin_lat * sin_lon, cos_lon, -cos_lat * sin_lon,
-            cos_lat, 0.f, -sin_lat;
-
-        return R;
-    }
-} // namespace imuextension
+#include "coordinate_rotators.hpp"
 
 struct NoGravityCompensation {
     static Eigen::Vector3f apply(const Eigen::Vector3f& a_ned) {
@@ -86,7 +60,7 @@ public:
 
         a_ned = GravityPolicy::apply(a_ned);
 
-        Eigen::Matrix3f R_ned_to_ecef = imuextension::computeNEDtoECEFRotation(pos_ecef);
+        Eigen::Matrix3f R_ned_to_ecef = coordinate_rotators::computeNEDtoECEFRotation(pos_ecef);
         Eigen::Vector3f a_ecef = R_ned_to_ecef * a_ned;
 
         return std::array<au::QuantityF<au::MetersPerSecondSquaredInEcefFrame>, 3>{

@@ -3,6 +3,7 @@
 #include "Kalman.hpp"
 #include "coordinate_transformations.hpp"
 #include "au.hpp"
+#include "PositionService.hpp"
 
 #include "TimeUtils.hpp"
 #include "GNSS.hpp"
@@ -148,8 +149,8 @@ protected:
     KalmanFilter<StateSize, PosMeasSize> kf;
 };
 
-template < typename PositionTracker, typename GNSS, typename IMU, typename OrientationProvider, typename GravityPolicy = NoGravityCompensation>
-requires(HasBodyAccelerometer<IMU>)
+template <typename PositionTracker, typename GNSS, typename IMU, typename OrientationProvider, typename GravityPolicy = NoGravityCompensation>
+    requires(HasBodyAccelerometer<IMU>)
 class GNSSandAccelPosition
 {
 public:
@@ -160,6 +161,7 @@ public:
     }
 
     bool predict(std::array<au::QuantityF<au::MetersInEcefFrame>, 3> &r, std::array<au::QuantityF<au::MetersPerSecondInEcefFrame>, 3> &v, au::QuantityU64<au::Milli<au::Seconds>> &timestamp);
+    PositionSolution predict();
 
 private:
     RTC_HandleTypeDef *hrtc_;
@@ -175,14 +177,14 @@ private:
     uint16_t imu_counter_;
 };
 
-template < typename PositionTracker, typename GNSS, typename IMU, typename OrientationProvider, typename GravityPolicy>
+template <typename PositionTracker, typename GNSS, typename IMU, typename OrientationProvider, typename GravityPolicy>
     requires(HasBodyAccelerometer<IMU>)
-bool GNSSandAccelPosition<PositionTracker, GNSS, IMU, OrientationProvider, GravityPolicy>::predict(std::array<au::QuantityF<au::MetersInEcefFrame>, 3> &r, std::array<au::QuantityF<au::MetersPerSecondInEcefFrame>, 3> &v, au::QuantityU64<au::Milli<au::Seconds>> &timestamp)
+PositionSolution GNSSandAccelPosition<PositionTracker, GNSS, IMU, OrientationProvider, GravityPolicy>::predict()
 {
     TimeUtils::RTCDateTimeSubseconds rtc;
     HAL_RTC_GetTime(hrtc_, &rtc.time, RTC_FORMAT_BIN);
     HAL_RTC_GetDate(hrtc_, &rtc.date, RTC_FORMAT_BIN);
-    timestamp = TimeUtils::from_rtc(rtc, hrtc_->Init.SynchPrediv);
+    au::QuantityU64<au::Milli<au::Seconds>> timestamp{TimeUtils::from_rtc(rtc, hrtc_->Init.SynchPrediv)};
 
     if (gnss_counter_ % gnss_rate_ == 0)
     {
@@ -218,12 +220,40 @@ bool GNSSandAccelPosition<PositionTracker, GNSS, IMU, OrientationProvider, Gravi
     auto state = tracker_.getState();
     // std::cerr << "[PositionTracker] pos.z = " << state[2] << ", vel.z = " << state[5] << std::endl;
 
-    std::transform(state.data(), state.data() + 3, r.begin(), [](const auto &item)
-                   { return au::make_quantity<au::MetersInEcefFrame>(item); });
-    std::transform(state.data() + 3, state.data() + 6, v.begin(), [](const auto &item)
-                   { return au::make_quantity<au::MetersPerSecondInEcefFrame>(item); });
-
     ++gnss_counter_;
     ++imu_counter_;
+
+    return PositionSolution{
+        timestamp,
+        {
+            au::make_quantity<au::MetersInEcefFrame>(state.data()[0]),
+            au::make_quantity<au::MetersInEcefFrame>(state.data()[1]),
+            au::make_quantity<au::MetersInEcefFrame>(state.data()[2])
+        },
+        {
+            au::make_quantity<au::MetersPerSecondInEcefFrame>(state.data()[3]),
+            au::make_quantity<au::MetersPerSecondInEcefFrame>(state.data()[4]),
+            au::make_quantity<au::MetersPerSecondInEcefFrame>(state.data()[5])
+        },
+        {
+            au::make_quantity<au::MetersPerSecondSquaredInEcefFrame>(state.data()[6]),
+            au::make_quantity<au::MetersPerSecondSquaredInEcefFrame>(state.data()[7]),
+            au::make_quantity<au::MetersPerSecondSquaredInEcefFrame>(state.data()[8])
+        },
+        static_cast<uint8_t>(PositionSolution::Validity::ACCELERATION) |
+        static_cast<uint8_t>(PositionSolution::Validity::POSITION) |
+        static_cast<uint8_t>(PositionSolution::Validity::VELOCITY)
+    };
+}
+
+template <typename PositionTracker, typename GNSS, typename IMU, typename OrientationProvider, typename GravityPolicy>
+    requires(HasBodyAccelerometer<IMU>)
+bool GNSSandAccelPosition<PositionTracker, GNSS, IMU, OrientationProvider, GravityPolicy>::predict(std::array<au::QuantityF<au::MetersInEcefFrame>, 3> &r, std::array<au::QuantityF<au::MetersPerSecondInEcefFrame>, 3> &v, au::QuantityU64<au::Milli<au::Seconds>> &timestamp)
+{
+    PositionSolution solution = predict();
+    timestamp = solution.timestamp;
+    r = solution.position;
+    v = solution.velocity;
+
     return true;
 }

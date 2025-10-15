@@ -40,7 +40,7 @@ public:
     CyphalTransfer transfer_;
 };
 
-class MockTaskFromBuffer : public TaskFromBuffer
+class MockTaskFromBuffer : public TaskFromBuffer<CyphalBuffer8>
 {
 public:
 MockTaskFromBuffer(uint32_t interval, uint32_t tick, const CyphalTransfer transfer) : TaskFromBuffer(interval, tick), transfer_(transfer) {}

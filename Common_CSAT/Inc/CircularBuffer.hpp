@@ -4,6 +4,7 @@
 #include <array>
 #include <cstddef>
 #include <utility>
+#include "BufferLikeConcept.hpp"
 
 template <typename T, size_t capacity_>
 class CircularBuffer
@@ -92,5 +93,7 @@ private:
     size_t tail_;
     size_t count_;
 };
+
+static_assert(BufferLike<CircularBuffer<int, 8>, int>);
 
 #endif /* INC_CIRCULARBUFFER_HPP_ */

@@ -11,11 +11,11 @@
 #include "nunavut/support/serialization.h"
 
 template <typename... Adapters>
-class TaskSubscribeNodePortList : public TaskFromBuffer
+class TaskSubscribeNodePortList : public TaskFromBuffer<CyphalBuffer8>
 {
 public:
     TaskSubscribeNodePortList() = delete;
-    TaskSubscribeNodePortList(SubscriptionManager *subscription_manager, uint32_t interval, uint32_t tick, std::tuple<Adapters...>& adapters) : TaskFromBuffer(interval, tick), adapters_(adapters), subscription_manager_(subscription_manager) {}
+    TaskSubscribeNodePortList(SubscriptionManager *subscription_manager, uint32_t interval, uint32_t tick, std::tuple<Adapters...>& adapters) : TaskFromBuffer<CyphalBuffer8>(interval, tick), adapters_(adapters), subscription_manager_(subscription_manager) {}
 
     virtual void registerTask(RegistrationManager *manager, std::shared_ptr<Task> task) override;
     virtual void unregisterTask(RegistrationManager *manager, std::shared_ptr<Task> task) override;
