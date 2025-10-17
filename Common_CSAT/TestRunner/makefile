@@ -128,7 +128,6 @@ SRC_FILES = ../Src/coordiate_transformations.cpp \
 			../Src/sgp4_tle.cpp \
 			../Src/TaskBlinkLED.cpp \
 			../Src/TaskCheckMemory.cpp \
-			../Src/TaskSetRTC.cpp \
 			../Src/TimeUtils.cpp \
 			../3rdParty/SGP4/SGP4.cpp
 
@@ -521,13 +520,9 @@ $(BIN_DIR)/TestTaskSetRTC.o : TestTaskSetRTC.cpp
 	@echo "Compiling $<"
 	$(CXX)	-c $< $(CXXFLAGS) $(EXTRA_FLAGS) $(EXTRA_EXTRA_FLAGS) $(INCLUDE_PATHS) -o $@
 
-$(BIN_DIR)/TaskSetRTC.o : ../Src/TaskSetRTC.cpp
-	@echo "Compiling $<"
-	$(CXX)	-c $< $(CXXFLAGS) $(EXTRA_FLAGS) $(EXTRA_EXTRA_FLAGS) $(INCLUDE_PATHS) -o $@
-
-$(BIN_DIR)/TestTaskSetRTC : $(BIN_DIR)/TestTaskSetRTC.o $(MOCK_HAL_OBJECTS) $(BIN_DIR)/RegistrationManager.o $(BIN_DIR)/TaskSetRTC.o $(BIN_DIR)/GNSS.o $(BIN_DIR)/GNSSCore.o $(BIN_DIR)/TimeUtils.o
+$(BIN_DIR)/TestTaskSetRTC : $(BIN_DIR)/TestTaskSetRTC.o $(MOCK_HAL_OBJECTS) $(BIN_DIR)/RegistrationManager.o $(BIN_DIR)/GNSS.o $(BIN_DIR)/GNSSCore.o $(BIN_DIR)/TimeUtils.o
 	@echo "Linking $@"
-	$(CXX) $(LIBS_PATH) -o $@ $(BIN_DIR)/TestTaskSetRTC.o $(MOCK_HAL_OBJECTS) $(BIN_DIR)/RegistrationManager.o $(BIN_DIR)/TaskSetRTC.o $(BIN_DIR)/GNSS.o $(BIN_DIR)/GNSSCore.o $(BIN_DIR)/TimeUtils.o $(LIBS) 
+	$(CXX) $(LIBS_PATH) -o $@ $(BIN_DIR)/TestTaskSetRTC.o $(MOCK_HAL_OBJECTS) $(BIN_DIR)/RegistrationManager.o $(BIN_DIR)/GNSS.o $(BIN_DIR)/GNSSCore.o $(BIN_DIR)/TimeUtils.o $(LIBS) 
 	@echo "Linking $@"
 
 # Rule for TestTaskSGP4 with extra sources

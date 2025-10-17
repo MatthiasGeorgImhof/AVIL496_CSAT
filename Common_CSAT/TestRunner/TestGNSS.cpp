@@ -8,10 +8,14 @@
 
 TEST_CASE("GNSS getNavPosECEF Trivial Test")
 {
-    UART_HandleTypeDef huart;
+    static UART_HandleTypeDef huart;
     init_uart_handle(&huart);
     clear_uart_rx_buffer();
-    GNSS gnss(&huart);
+
+    using Config = UART_Config<huart>;
+    using Transport = UARTTransport<Config>;
+    Transport transport;
+    GNSS<Transport> gnss(transport);
 
     SUBCASE("Valid Data")
     {
@@ -55,10 +59,14 @@ TEST_CASE("GNSS getNavPosECEF Trivial Test")
 
 TEST_CASE("GNSS getNavVelNED Trivial Test")
 {
-    UART_HandleTypeDef huart;
+    static UART_HandleTypeDef huart;
     init_uart_handle(&huart);
     clear_uart_rx_buffer();
-    GNSS gnss(&huart);
+
+    using Config = UART_Config<huart>;
+    using Transport = UARTTransport<Config>;
+    Transport transport;
+    GNSS<Transport> gnss(transport);
 
     SUBCASE("Valid Data")
     {
@@ -81,10 +89,14 @@ TEST_CASE("GNSS getNavVelNED Trivial Test")
 
 TEST_CASE("GNSS getNavVelECEF Trivial Test")
 {
-    UART_HandleTypeDef huart;
+    static UART_HandleTypeDef huart;
     init_uart_handle(&huart);
     clear_uart_rx_buffer();
-    GNSS gnss(&huart);
+    
+    using Config = UART_Config<huart>;
+    using Transport = UARTTransport<Config>;
+    Transport transport;
+    GNSS<Transport> gnss(transport);
 
     SUBCASE("Valid Data")
     {
@@ -104,10 +116,14 @@ TEST_CASE("GNSS getNavVelECEF Trivial Test")
 
 TEST_CASE("GNSS getUniqID Test")
 {
-    UART_HandleTypeDef huart;
+    static UART_HandleTypeDef huart;
     init_uart_handle(&huart);
     clear_uart_rx_buffer();
-    GNSS gnss(&huart);
+
+    using Config = UART_Config<huart>;
+    using Transport = UARTTransport<Config>;
+    Transport transport;
+    GNSS<Transport> gnss(transport);
 
     constexpr uint8_t test_data[] = {0xB5, 0x62, 0x27, 0x03, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 73, 249};
     static_assert(sizeof(test_data) == 18);
@@ -127,10 +143,14 @@ TEST_CASE("GNSS getUniqID Test")
 
 TEST_CASE("GNSS getNavPVT Test")
 {
-    UART_HandleTypeDef huart;
+    static UART_HandleTypeDef huart;
     init_uart_handle(&huart);
     clear_uart_rx_buffer();
-    GNSS gnss(&huart);
+
+    using Config = UART_Config<huart>;
+    using Transport = UARTTransport<Config>;
+    Transport transport;
+    GNSS<Transport> gnss(transport);
 
     constexpr uint8_t test_data[] = {0xB5, 0x62, 0x01, 0x07, 0x5C, 0x00, 0xA0, 0x3B, 0x56, 0x0F,
                                      0xE9, 0x07, 0x01, 0x07, 0x17, 0x1C, 0x0B, 0x37, 0x1F, 0x00,
@@ -177,10 +197,14 @@ TEST_CASE("GNSS getNavPVT Test")
 
 TEST_CASE("GNSS getNavPosLLH Test")
 {
-    UART_HandleTypeDef huart;
+    static UART_HandleTypeDef huart;
     init_uart_handle(&huart);
     clear_uart_rx_buffer();
-    GNSS gnss(&huart);
+
+    using Config = UART_Config<huart>;
+    using Transport = UARTTransport<Config>;
+    Transport transport;
+    GNSS<Transport> gnss(transport);
 
     constexpr uint8_t test_data[] = {0xB5, 0x62, 0x01, 0x02, 0x1c, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1a, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
                                      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 58, 42};
@@ -201,10 +225,14 @@ TEST_CASE("GNSS getNavPosLLH Test")
 
 TEST_CASE("GNSS getNavTimeUTC Test")
 {
-    UART_HandleTypeDef huart;
+    static UART_HandleTypeDef huart;
     init_uart_handle(&huart);
     clear_uart_rx_buffer();
-    GNSS gnss(&huart);
+
+    using Config = UART_Config<huart>;
+    using Transport = UARTTransport<Config>;
+    Transport transport;
+    GNSS<Transport> gnss(transport);
 
     constexpr uint8_t test_data[] = {0xB5, 0x62, 0x01, 0x21, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xe8, 0x07, 0x00, 0x00,
                                      0x00, 0x00, 0x00, 0x00, 37, 56};

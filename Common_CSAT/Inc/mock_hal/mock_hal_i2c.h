@@ -11,6 +11,8 @@ extern "C" {
 // Include core definitions
 #include "mock_hal/mock_hal_core.h"
 
+#define MOCK_HAL_I2C_ENABLED
+
 //--- I2C Defines ---
 #define I2C_MEMADD_SIZE_8BIT    (0x00000001U) // I2C Memory address size: 8-bit
 #define I2C_MEMADD_SIZE_16BIT   (0x00000002U) // I2C Memory address size: 16-bit
