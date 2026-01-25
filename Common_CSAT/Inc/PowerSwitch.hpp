@@ -3,6 +3,7 @@
 
 #include "Transport.hpp"
 #include <cstdint>
+#include <cstring>
 #include <array>
 
 // MCP23008 Register Definitions
@@ -10,7 +11,7 @@ enum class MCP23008_REGISTERS : uint8_t
 {
     MCP23008_IODIR = 0x00,
     MCP23008_IPOL = 0x01,
-    MCP23008_GPINTEN  = 0x02,
+    MCP23008_GPINTEN = 0x02,
     MCP23008_DEFVAL = 0x03,
     MCP23008_INTCON = 0x04,
     MCP23008_IOCON = 0x05,
@@ -21,6 +22,18 @@ enum class MCP23008_REGISTERS : uint8_t
     MCP23008_OLAT = 0x0A,
 };
 
+enum class CIRCUITS : uint8_t
+{
+    CIRCUIT_0 = 0b00000001,
+    CIRCUIT_1 = 0b00000010,
+    CIRCUIT_2 = 0b00000100,
+    CIRCUIT_3 = 0b00001000,
+    CIRCUIT_4 = 0b00010000,
+    CIRCUIT_5 = 0b00100000,
+    CIRCUIT_6 = 0b01000000,
+    CIRCUIT_7 = 0b10000000,
+};
+
 template <typename Transport>
     requires RegisterModeTransport<Transport>
 class PowerSwitch
@@ -28,34 +41,27 @@ class PowerSwitch
 public:
     PowerSwitch() = delete;
 
-    explicit PowerSwitch(const Transport &transport)
-        : transport_(transport), register_value_(0)
+    explicit PowerSwitch(const Transport &transport, GPIO_TypeDef *resetPort, uint16_t resetPin)
+        : transport_(transport), register_value_(0), reset_port_(resetPort), reset_pin_(resetPin)
     {
-        uint8_t reset[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-        writeRegister(MCP23008_REGISTERS::MCP23008_IODIR, reset, sizeof(reset));
+        releaseReset();
     }
 
-    bool on(uint8_t slot)
+    bool on(CIRCUITS circuit)
     {
-        if (invalidSlot(slot))
-            return false;
-        register_value_ |= static_cast<uint8_t>(1 << slot);
+        register_value_ |= static_cast<uint8_t>(circuit);
         return writeRegister(MCP23008_REGISTERS::MCP23008_OLAT, &register_value_, 1);
     }
 
-    bool off(uint8_t slot)
+    bool off(CIRCUITS circuit)
     {
-        if (invalidSlot(slot))
-            return false;
-        register_value_ &= static_cast<uint8_t>(~(1 << slot));
+        register_value_ &= ~static_cast<uint8_t>(circuit);
         return writeRegister(MCP23008_REGISTERS::MCP23008_OLAT, &register_value_, 1);
     }
 
-    bool status(uint8_t slot) const
+    bool status(CIRCUITS circuit) const
     {
-        if (invalidSlot(slot))
-            return false;
-        return (register_value_ & (1 << slot)) != 0;
+        return (register_value_ & static_cast<uint8_t>(circuit));
     }
 
     bool setState(uint8_t mask)
@@ -70,40 +76,39 @@ public:
         return register_value_;
     }
 
-private:
-    bool writeRegister(MCP23008_REGISTERS reg, uint8_t *data, uint16_t size)
+    void holdReset()
     {
-        constexpr size_t MaxSize = 16;
-        static_assert(MaxSize >= 1, "MaxSize must accommodate register + data");
+        // Set *Reset pin low
+        HAL_GPIO_WritePin(reset_port_, reset_pin_, GPIO_PIN_RESET);
+    }
 
-        if (size > MaxSize - 1)
-        {
-            return false; // prevent overflow
-        }
+    void releaseReset()
+    {
+        // Set *Reset pin high
+        HAL_GPIO_WritePin(reset_port_, reset_pin_, GPIO_PIN_SET);
 
-        std::array<uint8_t, MaxSize> tx{};
-        tx[0] = static_cast<uint8_t>(reg);
-        std::memcpy(&tx[1], data, size);
+        uint8_t reset[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+        writeRegister(MCP23008_REGISTERS::MCP23008_IODIR, reset, sizeof(reset));
+    }
 
-        return transport_.write(tx.data(), size + 1);
+private:
+    bool writeRegister(MCP23008_REGISTERS reg, const uint8_t *data, uint16_t size)
+    {
+        return transport_.write_reg(static_cast<uint16_t>(reg), data, size);
     }
 
     uint8_t readRegister(MCP23008_REGISTERS reg) const
     {
-    	uint8_t tx = static_cast<uint8_t>(reg);
-    	uint8_t rx;
-    	transport_.write_then_read(&tx, 1, &rx, 1);
-    	return rx;
-    }
-
-    static constexpr bool invalidSlot(uint8_t slot)
-    {
-        return slot >= 8;
+        uint8_t rx{};
+        transport_.read_reg(static_cast<uint16_t>(reg), &rx, 1);
+        return rx;
     }
 
 private:
     const Transport &transport_;
     uint8_t register_value_;
+    GPIO_TypeDef *reset_port_;
+    uint16_t reset_pin_;
 };
 
 #endif /* _POWER_SWITCH_H_ */

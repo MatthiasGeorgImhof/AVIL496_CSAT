@@ -17,30 +17,40 @@ INCLUDE_PATHS = -I ../Inc \
 				-I ../OpenCyphal/target 
 
 LIBS_PATH =			-L $(HOME)/Data/github/can/lib_x86_64
-LIBS =				-lcanardd -lserardd -ludpardd -lo1heapd
+LIBS =				-lcanard_fw -lserard_fw -ludpard_fw -lo1heap
 
 # Source and object files
-TEST_FILES = TestArrayList.cpp \
+TEST_FILES = TestAccessorEraseAndFormat.cpp \
+			 TestArrayList.cpp \
 			 TestBlobStore.cpp \
 			 TestBMI270_MMC5983.cpp \
 			 TestBMI270.cpp \
 			 TestBoxSet.cpp \
 			 TestBoxSetIterator.cpp \
-			 TestCachedImageBuffer.cpp \
-			 TestCameraSwitch.cpp \
+			 TestBufferState.cpp \
+			 TestCameraControls.cpp \
+			 TestCameraPowerConverters.cpp \
+			 TestCameraPowerRails.cpp \
 			 TestCircularBuffer.cpp \
 			 TestCoordinateTransformations.cpp \
 			 TestCyphal.cpp \
 			 TestCyphalSubscriptions.cpp \
 			 TestDetumblerSystem.cpp \
+			 TestDirectMemoryAccessor.cpp \
 			 TestFileAccess.cpp \
 			 TestFileSource.cpp \
 			 TestGNSS.cpp \
+			 TestGpioPin.cpp \
 			 TestHalUtil.cpp \
+			 TestHeapAllocation.cpp \
 			 TestHSClockSwitch.cpp \
+			 TestI2CSwitch.cpp \
 			 TestIGRFModel.cpp \
 			 TestImageBuffer.cpp \
-			 TestImageBufferAccessor.cpp \
+			 TestImageBufferInternals.cpp \
+			 TestImageBufferFalseHeaders.cpp \
+			 TestImageBufferReconstruction.cpp \
+			 TestImageToWritePipeline.cpp \
 			 TestIMUExtension.cpp \
 			 TestInputOutputStream.cpp \
 			 TestKalmanFunctionGPS.cpp \
@@ -54,13 +64,20 @@ TEST_FILES = TestArrayList.cpp \
 			 TestMagnetorquerDriver.cpp \
 			 TestMagnetorquerSystem.cpp \
 			 TestMainLoop.cpp \
+			 TestMLX90640.cpp \
+			 TestMLX90640AgainstMelexis.cpp \
+			 TestMLX90640EEPROM.cpp \
+			 TestMLX90640ImageProcessor.cpp \
 			 TestMMC5983.cpp \
 			 TestMockHal.cpp \
 			 TestMR25H10.cpp \
+			 TestMT29F4G01Accessor.cpp \
 			 TestNamedVector3f.cpp \
 			 TestO1HeapAllocator.cpp \
 			 TestOrientationService.cpp \
 			 TestOrientationTracker.cpp \
+			 TestOV2640.cpp \
+			 TestOV5640.cpp \
 			 TestPositionTracker9D.cpp \
 			 TestPowerMonitor.cpp \
 			 TestPowerSwitch.cpp \
@@ -78,6 +95,7 @@ TEST_FILES = TestArrayList.cpp \
 			 TestTaskCheckMemory.cpp \
 			 TestTaskDetumbler.cpp \
 			 TestTaskMagnetorquer.cpp \
+			 TestTaskMLX90640.cpp \
 			 TestTaskOrientationService.cpp \
 			 TestTaskPositionService.cpp \
 			 TestTaskProcessHeartBeat.cpp \
@@ -97,6 +115,8 @@ TEST_FILES = TestArrayList.cpp \
 			 TestTaskSubscribeNodePortList.cpp \
 			 TestTimeUtils.cpp \
 			 TestTransport.cpp \
+			 TestTrigger.cpp \
+			 TestTrivialImageBuffer.cpp \
 			 TestWMMLegendre.cpp \
 			 TestWMMModel.cpp
 
@@ -106,6 +126,7 @@ HAL_TEST_FILES =   tests/test_hal_can.cpp \
 				   tests/test_hal_dcmi.cpp \
 				   tests/test_hal_gpio.cpp \
 				   tests/test_hal_i2c.cpp \
+				   tests/test_hal_irq.cpp \
 				   tests/test_hal_spi.cpp \
 				   tests/test_hal_timer.cpp \
 				   tests/test_hal_uart.cpp \
@@ -129,7 +150,8 @@ SRC_FILES = ../Src/coordiate_transformations.cpp \
 			../Src/TaskBlinkLED.cpp \
 			../Src/TaskCheckMemory.cpp \
 			../Src/TimeUtils.cpp \
-			../3rdParty/SGP4/SGP4.cpp
+			../3rdParty/SGP4/SGP4.cpp \
+			3rdParty/MLX90640_API.c
 
 # Mock HAL source files
 MOCK_HAL_SRC_FILES =   ../Src/mock_hal.c \
@@ -139,6 +161,7 @@ MOCK_HAL_SRC_FILES =   ../Src/mock_hal.c \
 					   ../Src/mock_hal/mock_hal_dcmi.c \
 					   ../Src/mock_hal/mock_hal_gpio.c \
 					   ../Src/mock_hal/mock_hal_i2c.c \
+					   ../Src/mock_hal/mock_hal_irq.c \
 					   ../Src/mock_hal/mock_hal_mem.c \
 					   ../Src/mock_hal/mock_hal_rtc.c \
 					   ../Src/mock_hal/mock_hal_spi.c \
@@ -214,7 +237,7 @@ $(BIN_DIR)/TestCyphal.o : TestCyphal.cpp
 	@echo "Compiling $<"
 	$(CXX) -c $< $(CXXFLAGS) $(EXTRA_FLAGS) $(EXTRA_EXTRA_FLAGS) $(INCLUDE_PATHS) -o $@
 
-$(BIN_DIR)/TestCyphal : $(BIN_DIR)/TestCyphal.o $(MOCK_HAL_OBJECTS) # Link the object file
+$(BIN_DIR)/TestCyphal : $(BIN_DIR)/TestCyphal.o $(MOCK_HAL_OBJECTS)
 	@echo "Linking $@"
 	$(CXX) $(LIBS_PATH) -o $@ $(BIN_DIR)/TestCyphal.o $(MOCK_HAL_OBJECTS) $(LIBS)
 
@@ -223,16 +246,25 @@ $(BIN_DIR)/TestBMI270.o : TestBMI270.cpp
 	@echo "Compiling $<"
 	$(CXX) -c $< $(CXXFLAGS) $(EXTRA_FLAGS) $(EXTRA_EXTRA_FLAGS) $(INCLUDE_PATHS) -o $@
 
-$(BIN_DIR)/TestBMI270 : $(BIN_DIR)/TestBMI270.o $(MOCK_HAL_OBJECTS) # Link the object file
+$(BIN_DIR)/TestBMI270 : $(BIN_DIR)/TestBMI270.o $(MOCK_HAL_OBJECTS)
 	@echo "Linking $@"
 	$(CXX) $(LIBS_PATH) -o $@ $(BIN_DIR)/TestBMI270.o $(MOCK_HAL_OBJECTS) $(LIBS)
+
+# Rule for TestAccessorEraseAndFormat with extra sources
+$(BIN_DIR)/TestAccessorEraseAndFormat.o : TestAccessorEraseAndFormat.cpp
+	@echo "Compiling $<"
+	$(CXX) -c $< $(CXXFLAGS) $(EXTRA_FLAGS) $(EXTRA_EXTRA_FLAGS) $(INCLUDE_PATHS) -o $@
+
+$(BIN_DIR)/TestAccessorEraseAndFormat : $(BIN_DIR)/TestAccessorEraseAndFormat.o $(MOCK_HAL_OBJECTS)
+	@echo "Linking $@"
+	$(CXX) $(LIBS_PATH) -o $@ $(BIN_DIR)/TestAccessorEraseAndFormat.o $(MOCK_HAL_OBJECTS) $(LIBS)
 
 # Rule for TestBMI270_MMC5983 with extra sources
 $(BIN_DIR)/TestBMI270_MMC5983.o : TestBMI270_MMC5983.cpp
 	@echo "Compiling $<"
 	$(CXX) -c $< $(CXXFLAGS) $(EXTRA_FLAGS) $(EXTRA_EXTRA_FLAGS) $(INCLUDE_PATHS) -o $@
 
-$(BIN_DIR)/TestBMI270_MMC5983 : $(BIN_DIR)/TestBMI270_MMC5983.o $(MOCK_HAL_OBJECTS) # Link the object file
+$(BIN_DIR)/TestBMI270_MMC5983 : $(BIN_DIR)/TestBMI270_MMC5983.o $(MOCK_HAL_OBJECTS)
 	@echo "Linking $@"
 	$(CXX) $(LIBS_PATH) -o $@ $(BIN_DIR)/TestBMI270_MMC5983.o $(MOCK_HAL_OBJECTS) $(LIBS)
 
@@ -241,7 +273,7 @@ $(BIN_DIR)/TestMMC5983.o : TestMMC5983.cpp
 	@echo "Compiling $<"
 	$(CXX) -c $< $(CXXFLAGS) $(EXTRA_FLAGS) $(EXTRA_EXTRA_FLAGS) $(INCLUDE_PATHS) -o $@
 
-$(BIN_DIR)/TestMMC5983 : $(BIN_DIR)/TestMMC5983.o $(MOCK_HAL_OBJECTS) # Link the object file
+$(BIN_DIR)/TestMMC5983 : $(BIN_DIR)/TestMMC5983.o $(MOCK_HAL_OBJECTS)
 	@echo "Linking $@"
 	$(CXX) $(LIBS_PATH) -o $@ $(BIN_DIR)/TestMMC5983.o $(MOCK_HAL_OBJECTS) $(LIBS)
 
@@ -250,27 +282,125 @@ $(BIN_DIR)/TestMR25H10.o : TestMR25H10.cpp
 	@echo "Compiling $<"
 	$(CXX) -c $< $(CXXFLAGS) $(EXTRA_FLAGS) $(EXTRA_EXTRA_FLAGS) $(INCLUDE_PATHS) -o $@
 
-$(BIN_DIR)/TestMR25H10 : $(BIN_DIR)/TestMR25H10.o $(MOCK_HAL_OBJECTS) # Link the object file
+$(BIN_DIR)/TestMR25H10 : $(BIN_DIR)/TestMR25H10.o $(MOCK_HAL_OBJECTS)
 	@echo "Linking $@"
 	$(CXX) $(LIBS_PATH) -o $@ $(BIN_DIR)/TestMR25H10.o $(MOCK_HAL_OBJECTS) $(LIBS)
 
-# Rule for TestCameraSwitch with extra sources
-$(BIN_DIR)/TestCameraSwitch.o : TestCameraSwitch.cpp
+# Rule for TestMLX90640 with extra sources
+$(BIN_DIR)/TestMLX90640.o : TestMLX90640.cpp
 	@echo "Compiling $<"
 	$(CXX) -c $< $(CXXFLAGS) $(EXTRA_FLAGS) $(EXTRA_EXTRA_FLAGS) $(INCLUDE_PATHS) -o $@
 
-$(BIN_DIR)/TestCameraSwitch : $(BIN_DIR)/TestCameraSwitch.o $(MOCK_HAL_OBJECTS) # Link the object file
+$(BIN_DIR)/TestMLX90640 : $(BIN_DIR)/TestMLX90640.o $(MOCK_HAL_OBJECTS)
 	@echo "Linking $@"
-	$(CXX) $(LIBS_PATH) -o $@ $(BIN_DIR)/TestCameraSwitch.o $(MOCK_HAL_OBJECTS) $(LIBS)
+	$(CXX) $(LIBS_PATH) -o $@ $(BIN_DIR)/TestMLX90640.o $(MOCK_HAL_OBJECTS) $(LIBS)
+
+# Rule for TestMLX90640AgainstMelexis with extra sources
+$(BIN_DIR)/TestMLX90640AgainstMelexis.o : TestMLX90640AgainstMelexis.cpp
+	@echo "Compiling $<"
+	$(CXX) -c $< $(CXXFLAGS) $(EXTRA_FLAGS) $(EXTRA_EXTRA_FLAGS) $(INCLUDE_PATHS) -I3rdParty -o $@
+
+$(BIN_DIR)/MLX90640_API.o : 3rdParty/MLX90640_API.c
+	@echo "Compiling $<"
+	$(CXX) -c $< $(CXXFLAGS) $(INCLUDE_PATHS) -I3rdParty -o $@
+
+$(BIN_DIR)/TestMLX90640AgainstMelexis : $(BIN_DIR)/TestMLX90640AgainstMelexis.o $(BIN_DIR)/MLX90640_API.o
+	@echo "Linking $@"
+	$(CXX) $(LIBS_PATH) -o $@ $(BIN_DIR)/TestMLX90640AgainstMelexis.o $(BIN_DIR)/MLX90640_API.o $(LIBS)
+
+# Rule for TestMLX90640ImageProcessor with extra sources
+$(BIN_DIR)/TestMLX90640ImageProcessor.o : TestMLX90640ImageProcessor.cpp
+	@echo "Compiling $<"
+	$(CXX) -c $< $(CXXFLAGS) $(EXTRA_FLAGS) $(EXTRA_EXTRA_FLAGS) $(INCLUDE_PATHS) -o $@
+
+$(BIN_DIR)/MLX90640ImageProcessor.o : ../Src/MLX90640ImageProcessor.cpp
+	@echo "Compiling $<"
+	$(CXX) -c $< $(CXXFLAGS) $(EXTRA_FLAGS) $(EXTRA_EXTRA_FLAGS) $(INCLUDE_PATHS) -o $@
+
+$(BIN_DIR)/TestMLX90640ImageProcessor : $(BIN_DIR)/TestMLX90640ImageProcessor.o $(BIN_DIR)/MLX90640ImageProcessor.o
+	@echo "Linking $@"
+	$(CXX) $(LIBS_PATH) -o $@ $(BIN_DIR)/TestMLX90640ImageProcessor.o $(BIN_DIR)/MLX90640ImageProcessor.o $(LIBS)
+
+# Rule for TestMLX90640 with extra sources
+$(BIN_DIR)/TestTaskMLX90640.o : TestTaskMLX90640.cpp
+	@echo "Compiling $<"
+	$(CXX) -c $< $(CXXFLAGS) $(EXTRA_FLAGS) $(EXTRA_EXTRA_FLAGS) $(INCLUDE_PATHS) -o $@
+
+$(BIN_DIR)/TestTaskMLX90640 : $(BIN_DIR)/TestTaskMLX90640.o $(BIN_DIR)/RegistrationManager.o $(MOCK_HAL_OBJECTS)
+	@echo "Linking $@"
+	$(CXX) $(LIBS_PATH) -o $@ $(BIN_DIR)/TestTaskMLX90640.o $(BIN_DIR)/RegistrationManager.o $(MOCK_HAL_OBJECTS) $(LIBS)
+
+# Rule for TestOV2640 with extra sources
+$(BIN_DIR)/TestOV2640.o : TestOV2640.cpp
+	@echo "Compiling $<"
+	$(CXX) -c $< $(CXXFLAGS) $(EXTRA_FLAGS) $(EXTRA_EXTRA_FLAGS) $(INCLUDE_PATHS) -o $@
+
+$(BIN_DIR)/TestOV2640 : $(BIN_DIR)/TestOV2640.o $(MOCK_HAL_OBJECTS)
+	@echo "Linking $@"
+	$(CXX) $(LIBS_PATH) -o $@ $(BIN_DIR)/TestOV2640.o $(MOCK_HAL_OBJECTS) $(LIBS)
+
+# Rule for TestOV5640 with extra sources
+$(BIN_DIR)/TestOV5640.o : TestOV5640.cpp
+	@echo "Compiling $<"
+	$(CXX) -c $< $(CXXFLAGS) $(EXTRA_FLAGS) $(EXTRA_EXTRA_FLAGS) $(INCLUDE_PATHS) -o $@
+
+$(BIN_DIR)/TestOV5640 : $(BIN_DIR)/TestOV5640.o $(MOCK_HAL_OBJECTS)
+	@echo "Linking $@"
+	$(CXX) $(LIBS_PATH) -o $@ $(BIN_DIR)/TestOV5640.o $(MOCK_HAL_OBJECTS) $(LIBS)
+
+# Rule for TestGpioPin with extra sources
+$(BIN_DIR)/TestGpioPin.o : TestGpioPin.cpp
+	@echo "Compiling $<"
+	$(CXX) -c $< $(CXXFLAGS) $(EXTRA_FLAGS) $(EXTRA_EXTRA_FLAGS) $(INCLUDE_PATHS) -o $@
+
+$(BIN_DIR)/TestGpioPin : $(BIN_DIR)/TestGpioPin.o $(MOCK_HAL_OBJECTS)
+	@echo "Linking $@"
+	$(CXX) $(LIBS_PATH) -o $@ $(BIN_DIR)/TestGpioPin.o $(MOCK_HAL_OBJECTS) $(LIBS)
+
+# Rule for TestCameraControls with extra sources
+$(BIN_DIR)/TestCameraControls.o : TestCameraControls.cpp
+	@echo "Compiling $<"
+	$(CXX) -c $< $(CXXFLAGS) $(EXTRA_FLAGS) $(EXTRA_EXTRA_FLAGS) $(INCLUDE_PATHS) -o $@
+
+$(BIN_DIR)/TestCameraControls : $(BIN_DIR)/TestCameraControls.o $(MOCK_HAL_OBJECTS)
+	@echo "Linking $@"
+	$(CXX) $(LIBS_PATH) -o $@ $(BIN_DIR)/TestCameraControls.o $(MOCK_HAL_OBJECTS) $(LIBS)
+
+# Rule for TestCameraPowerConverters with extra sources
+$(BIN_DIR)/TestCameraPowerConverters.o : TestCameraPowerConverters.cpp
+	@echo "Compiling $<"
+	$(CXX) -c $< $(CXXFLAGS) $(EXTRA_FLAGS) $(EXTRA_EXTRA_FLAGS) $(INCLUDE_PATHS) -o $@
+
+$(BIN_DIR)/TestCameraPowerConverters : $(BIN_DIR)/TestCameraPowerConverters.o $(MOCK_HAL_OBJECTS)
+	@echo "Linking $@"
+	$(CXX) $(LIBS_PATH) -o $@ $(BIN_DIR)/TestCameraPowerConverters.o $(MOCK_HAL_OBJECTS) $(LIBS)
+
+# Rule for TestCameraPowerRails with extra sources
+$(BIN_DIR)/TestCameraPowerRails.o : TestCameraPowerRails.cpp
+	@echo "Compiling $<"
+	$(CXX) -c $< $(CXXFLAGS) $(EXTRA_FLAGS) $(EXTRA_EXTRA_FLAGS) $(INCLUDE_PATHS) -o $@
+
+$(BIN_DIR)/TestCameraPowerRails : $(BIN_DIR)/TestCameraPowerRails.o $(MOCK_HAL_OBJECTS)
+	@echo "Linking $@"
+	$(CXX) $(LIBS_PATH) -o $@ $(BIN_DIR)/TestCameraPowerRails.o $(MOCK_HAL_OBJECTS) $(LIBS)
 
 # Rule for TestTransport with extra sources
 $(BIN_DIR)/TestTransport.o : TestTransport.cpp
 	@echo "Compiling $<"
 	$(CXX) -c $< $(CXXFLAGS) $(EXTRA_FLAGS) $(EXTRA_EXTRA_FLAGS) $(INCLUDE_PATHS) -o $@
 
-$(BIN_DIR)/TestTransport : $(BIN_DIR)/TestTransport.o $(MOCK_HAL_OBJECTS) # Link the object file
+$(BIN_DIR)/TestTransport : $(BIN_DIR)/TestTransport.o $(MOCK_HAL_OBJECTS)
 	@echo "Linking $@"
 	$(CXX) $(LIBS_PATH) -o $@ $(BIN_DIR)/TestTransport.o $(MOCK_HAL_OBJECTS) $(LIBS)
+
+# Rule for TestI2CSwitch with extra sources
+$(BIN_DIR)/TestI2CSwitch.o : TestI2CSwitch.cpp
+	@echo "Compiling $<"
+	$(CXX) -c $< $(CXXFLAGS) $(EXTRA_FLAGS) $(EXTRA_EXTRA_FLAGS) $(INCLUDE_PATHS) -o $@
+
+$(BIN_DIR)/TestI2CSwitch : $(BIN_DIR)/TestI2CSwitch.o $(MOCK_HAL_OBJECTS)
+	@echo "Linking $@"
+	$(CXX) $(LIBS_PATH) -o $@ $(BIN_DIR)/TestI2CSwitch.o $(MOCK_HAL_OBJECTS) $(LIBS)
 
 # Rule for TestHSClockSwitch with extra sources
 $(BIN_DIR)/TestHSClockSwitch.o : TestHSClockSwitch.cpp
@@ -281,25 +411,61 @@ $(BIN_DIR)/HSClockSwitch.o : ../Src/HSClockSwitch.cpp
 	@echo "Compiling $<"
 	$(CXX)	-c $< $(CXXFLAGS) $(EXTRA_FLAGS) $(EXTRA_EXTRA_FLAGS) $(INCLUDE_PATHS) -o $@
 
-$(BIN_DIR)/TestHSClockSwitch : $(BIN_DIR)/TestHSClockSwitch.o $(BIN_DIR)/HSClockSwitch.o $(MOCK_HAL_OBJECTS) # Link the object file
+$(BIN_DIR)/TestHSClockSwitch : $(BIN_DIR)/TestHSClockSwitch.o $(BIN_DIR)/HSClockSwitch.o $(MOCK_HAL_OBJECTS)
 	@echo "Linking $@"
 	$(CXX) $(LIBS_PATH) -o $@ $(BIN_DIR)/TestHSClockSwitch.o $(BIN_DIR)/HSClockSwitch.o $(MOCK_HAL_OBJECTS) $(LIBS)
 
-# Rule for TestImageBufferAccessor.cpp with extra sources
-$(BIN_DIR)/TestImageBufferAccessor.o : TestImageBufferAccessor.cpp
+# Rule for TestDirectMemoryAccessor.cpp with extra sources
+$(BIN_DIR)/TestDirectMemoryAccessor.o : TestDirectMemoryAccessor.cpp
 	@echo "Compiling $<"
 	$(CXX) -c $< $(CXXFLAGS) $(EXTRA_FLAGS) $(EXTRA_EXTRA_FLAGS) $(INCLUDE_PATHS) -o $@
 
-$(BIN_DIR)/TestImageBufferAccessor : $(BIN_DIR)/TestImageBufferAccessor.o $(MOCK_HAL_OBJECTS) # Link the object file
+$(BIN_DIR)/TestDirectMemoryAccessor : $(BIN_DIR)/TestDirectMemoryAccessor.o $(MOCK_HAL_OBJECTS)
 	@echo "Linking $@"
-	$(CXX) $(LIBS_PATH) -o $@ $(BIN_DIR)/TestImageBufferAccessor.o $(MOCK_HAL_OBJECTS) $(LIBS)
+	$(CXX) $(LIBS_PATH) -o $@ $(BIN_DIR)/TestDirectMemoryAccessor.o $(MOCK_HAL_OBJECTS) $(LIBS)
+
+# Rule for TestImageBufferInternals.cpp with extra sources
+$(BIN_DIR)/TestImageBufferInternals.o : TestImageBufferInternals.cpp
+	@echo "Compiling $<"
+	$(CXX) -c $< $(CXXFLAGS) $(EXTRA_FLAGS) $(EXTRA_EXTRA_FLAGS) $(INCLUDE_PATHS) -o $@
+
+$(BIN_DIR)/TestImageBufferInternals : $(BIN_DIR)/TestImageBufferInternals.o $(MOCK_HAL_OBJECTS)
+	@echo "Linking $@"
+	$(CXX) $(LIBS_PATH) -o $@ $(BIN_DIR)/TestImageBufferInternals.o $(MOCK_HAL_OBJECTS) $(LIBS)
+
+# Rule for TestImageBufferFalseHeaders.cpp with extra sources
+$(BIN_DIR)/TestImageBufferFalseHeaders.o : TestImageBufferFalseHeaders.cpp
+	@echo "Compiling $<"
+	$(CXX) -c $< $(CXXFLAGS) $(EXTRA_FLAGS) $(EXTRA_EXTRA_FLAGS) $(INCLUDE_PATHS) -o $@
+
+$(BIN_DIR)/TestImageBufferFalseHeaders : $(BIN_DIR)/TestImageBufferFalseHeaders.o $(MOCK_HAL_OBJECTS)
+	@echo "Linking $@"
+	$(CXX) $(LIBS_PATH) -o $@ $(BIN_DIR)/TestImageBufferFalseHeaders.o $(MOCK_HAL_OBJECTS) $(LIBS)
+
+# Rule for TestImageBufferReconstruction.cpp with extra sources
+$(BIN_DIR)/TestImageBufferReconstruction.o : TestImageBufferReconstruction.cpp
+	@echo "Compiling $<"
+	$(CXX) -c $< $(CXXFLAGS) $(EXTRA_FLAGS) $(EXTRA_EXTRA_FLAGS) $(INCLUDE_PATHS) -o $@
+
+$(BIN_DIR)/TestImageBufferReconstruction : $(BIN_DIR)/TestImageBufferReconstruction.o $(MOCK_HAL_OBJECTS)
+	@echo "Linking $@"
+	$(CXX) $(LIBS_PATH) -o $@ $(BIN_DIR)/TestImageBufferReconstruction.o $(MOCK_HAL_OBJECTS) $(LIBS)
+
+# Rule for TestMT29F4G01Accessor.cpp with extra sources
+$(BIN_DIR)/TestMT29F4G01Accessor.o : TestMT29F4G01Accessor.cpp
+	@echo "Compiling $<"
+	$(CXX) -c $< $(CXXFLAGS) $(EXTRA_FLAGS) $(EXTRA_EXTRA_FLAGS) $(INCLUDE_PATHS) -o $@
+
+$(BIN_DIR)/TestMT29F4G01Accessor : $(BIN_DIR)/TestMT29F4G01Accessor.o $(MOCK_HAL_OBJECTS)
+	@echo "Linking $@"
+	$(CXX) $(LIBS_PATH) -o $@ $(BIN_DIR)/TestMT29F4G01Accessor.o $(MOCK_HAL_OBJECTS) $(LIBS)
 
 # Rule for TestTask with extra sources
 $(BIN_DIR)/TestTask.o : TestTask.cpp
 	@echo "Compiling $<"
 	$(CXX) -c $< $(CXXFLAGS) $(EXTRA_FLAGS) $(EXTRA_EXTRA_FLAGS) $(INCLUDE_PATHS) -o $@
 
-$(BIN_DIR)/TestTask : $(BIN_DIR)/TestTask.o $(MOCK_HAL_OBJECTS) # Link the object file
+$(BIN_DIR)/TestTask : $(BIN_DIR)/TestTask.o $(MOCK_HAL_OBJECTS)
 	@echo "Linking $@"
 	$(CXX) $(LIBS_PATH) -o $@ $(BIN_DIR)/TestTask.o $(MOCK_HAL_OBJECTS) $(LIBS)
 
@@ -598,15 +764,6 @@ $(BIN_DIR)/TestImageBuffer : $(BIN_DIR)/TestImageBuffer.o $(MOCK_HAL_OBJECTS)
 	@echo "Linking $@"
 	$(CXX) $(LIBS_PATH) -o $@ $(BIN_DIR)/TestImageBuffer.o $(MOCK_HAL_OBJECTS) $(LIBS)
 
-# Rule for TestCachedImageBuffer with extra sources
-$(BIN_DIR)/TestCachedImageBuffer.o : TestCachedImageBuffer.cpp
-	@echo "Compiling $<"
-	$(CXX)	-c $< $(CXXFLAGS) $(EXTRA_FLAGS) $(EXTRA_EXTRA_FLAGS) $(INCLUDE_PATHS) -o $@
-
-$(BIN_DIR)/TestCachedImageBuffer : $(BIN_DIR)/TestCachedImageBuffer.o $(MOCK_HAL_OBJECTS)
-	@echo "Linking $@"
-	$(CXX) $(LIBS_PATH) -o $@ $(BIN_DIR)/TestCachedImageBuffer.o $(MOCK_HAL_OBJECTS) $(LIBS)
-
 # Rule for TestPowerSwitch with extra sources
 $(BIN_DIR)/TestPowerSwitch.o : TestPowerSwitch.cpp
 	@echo "Compiling $<"
@@ -630,9 +787,18 @@ $(BIN_DIR)/TestHalUtil.o : TestHalUtil.cpp
 	@echo "Compiling $<"
 	$(CXX) -c $< $(CXXFLAGS) $(EXTRA_FLAGS) $(EXTRA_EXTRA_FLAGS) $(INCLUDE_PATHS) -o $@
 
-$(BIN_DIR)/TestHalUtil : $(BIN_DIR)/TestHalUtil.o $(MOCK_HAL_OBJECTS) # Link the object file
+$(BIN_DIR)/TestHalUtil : $(BIN_DIR)/TestHalUtil.o $(MOCK_HAL_OBJECTS)
 	@echo "Linking $@"
 	$(CXX) $(LIBS_PATH) -o $@ $(BIN_DIR)/TestHalUtil.o $(MOCK_HAL_OBJECTS) $(LIBS)
+
+# Rule for TestHeapAllocation with extra sources
+$(BIN_DIR)/TestHeapAllocation.o : TestHeapAllocation.cpp
+	@echo "Compiling $<"
+	$(CXX) -c $< $(CXXFLAGS) $(EXTRA_FLAGS) $(EXTRA_EXTRA_FLAGS) $(INCLUDE_PATHS) -o $@
+
+$(BIN_DIR)/TestHeapAllocation : $(BIN_DIR)/TestHeapAllocation.o $(MOCK_HAL_OBJECTS)
+	@echo "Linking $@"
+	$(CXX) $(LIBS_PATH) -o $@ $(BIN_DIR)/TestHeapAllocation.o $(MOCK_HAL_OBJECTS) $(LIBS)
 
 # Rule for TestCoordinateTransformations with extra sources
 $(BIN_DIR)/TestCoordinateTransformations.o : TestCoordinateTransformations.cpp
@@ -685,6 +851,15 @@ $(BIN_DIR)/TestInputOutputStream.o : TestInputOutputStream.cpp
 $(BIN_DIR)/TestInputOutputStream : $(BIN_DIR)/TestInputOutputStream.o $ $(MOCK_HAL_OBJECTS)
 	@echo "Linking $@"
 	$(CXX) $(LIBS_PATH) -o $@ $(BIN_DIR)/TestInputOutputStream.o $(MOCK_HAL_OBJECTS) $(LIBS)
+
+# Rule for TestTrigger with extra sources
+$(BIN_DIR)/TestTrigger.o : TestTrigger.cpp
+	@echo "Compiling $<"
+	$(CXX)	-c $< $(CXXFLAGS) $(EXTRA_FLAGS) $(EXTRA_EXTRA_FLAGS) $(INCLUDE_PATHS) -o $@
+
+$(BIN_DIR)/TestTrigger : $(BIN_DIR)/TestTrigger.o $(MOCK_HAL_OBJECTS)
+	@echo "Linking $@"
+	$(CXX) $(LIBS_PATH) -o $@ $(BIN_DIR)/TestTrigger.o $(MOCK_HAL_OBJECTS) $(LIBS)
 
 # Rule for TestTimeUtils with extra sources
 $(BIN_DIR)/TestTimeUtils.o : TestTimeUtils.cpp
@@ -798,7 +973,7 @@ $(BIN_DIR)/TestIMUExtension.o : TestIMUExtension.cpp
 	@echo "Compiling $<"
 	$(CXX) -c $< $(CXXFLAGS) $(EXTRA_FLAGS) $(INCLUDE_PATHS) -o $@
 
-$(BIN_DIR)/TestIMUExtension : $(BIN_DIR)/TestIMUExtension.o $(BIN_DIR)/coordinate_transformations.o $(BIN_DIR)/coordinate_rotators.o $(BIN_DIR)/TimeUtils.o # Link the object file
+$(BIN_DIR)/TestIMUExtension : $(BIN_DIR)/TestIMUExtension.o $(BIN_DIR)/coordinate_transformations.o $(BIN_DIR)/coordinate_rotators.o $(BIN_DIR)/TimeUtils.o
 	@echo "Linking $@"
 	$(CXX) $(LIBS_PATH) -o $@ $(BIN_DIR)/TestIMUExtension.o $(BIN_DIR)/coordinate_transformations.o $(BIN_DIR)/coordinate_rotators.o $(BIN_DIR)/TimeUtils.o $(LIBS)
 

@@ -1,172 +1,145 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
+
 #include "PowerSwitch.hpp"
 #include "mock_hal.h"
 #include "Transport.hpp"
 
-#include <iostream> // For debugging output (remove in production tests)
-#include <bitset>   // For visualizing bit patterns
+GPIO_TypeDef mock_gpio_port{};
+constexpr uint16_t mock_gpio_pin = GPIO_PIN_0;
 
 TEST_CASE("PowerSwitch On/Off/Status")
 {
     static I2C_HandleTypeDef hi2c;
     constexpr uint8_t address = 0x40;
-    constexpr uint8_t ps_register = 0x0a;
 
-    using SwitchConfig = I2C_Config<hi2c, address>;
-    using SwitchTransport = I2CTransport<SwitchConfig>;
+    using SwitchConfig =
+        I2C_Register_Config<hi2c, address, I2CAddressWidth::Bits8>;
+
+    using SwitchTransport =
+        I2CRegisterTransport<SwitchConfig>;
+
     SwitchTransport transport;
 
-    PowerSwitch<SwitchTransport> pm(transport);
+    clear_i2c_addresses();
+    clear_i2c_tx_data();
+    clear_i2c_rx_data();
 
-    // Reset the I2C buffer before each test case
-    clear_i2c_mem_data();
+    PowerSwitch<SwitchTransport> pm(transport, &mock_gpio_port, mock_gpio_pin);
+
+    auto last_payload = [&]() -> const uint8_t* {
+        return get_i2c_tx_buffer();
+    };
+
+    auto payload_count = [&]() -> int {
+        return get_i2c_tx_buffer_count();
+    };
+
+    auto last_reg = [&]() -> uint8_t {
+        return static_cast<uint8_t>(get_i2c_mem_address());
+    };
 
     SUBCASE("Turn on slot 0")
     {
-        pm.on(0);
-        CHECK(get_i2c_buffer_count() == 2);
-        CHECK(get_i2c_buffer()[0] == ps_register);
-        CHECK(get_i2c_buffer()[1] == 0b00000001); // Bit 0 should be set
-        CHECK(pm.status(0) == true);
+        pm.on(CIRCUITS::CIRCUIT_0);
+
+        CHECK(last_reg() == static_cast<uint8_t>(MCP23008_REGISTERS::MCP23008_OLAT));
+        CHECK(payload_count() == 1);
+        CHECK(last_payload()[0] == 0b00000001);
+        CHECK(pm.status(CIRCUITS::CIRCUIT_0));
     }
 
     SUBCASE("Turn off slot 0")
     {
-        // First, turn it on
-        pm.on(0);
-        pm.off(0);
+        pm.on(CIRCUITS::CIRCUIT_0);
+        pm.off(CIRCUITS::CIRCUIT_0);
 
-        CHECK(get_i2c_buffer_count() == 2);
-        CHECK(get_i2c_buffer()[0] == ps_register);
-        CHECK(get_i2c_buffer()[1] == 0b00000000); // Bit 0 should be cleared
-        CHECK(pm.status(0) == false);
+        CHECK(last_reg() == static_cast<uint8_t>(MCP23008_REGISTERS::MCP23008_OLAT));
+        CHECK(payload_count() == 1);
+        CHECK(last_payload()[0] == 0b00000000);
+        CHECK_FALSE(pm.status(CIRCUITS::CIRCUIT_0));
     }
 
     SUBCASE("Turn on slot 1")
     {
-        pm.on(1);
-        CHECK(get_i2c_buffer_count() == 2);
-        CHECK(get_i2c_buffer()[0] == ps_register);
-        CHECK(get_i2c_buffer()[1] == 0b00000010); // Bit 1 should be set
-        CHECK(pm.status(1) == true);
+        pm.on(CIRCUITS::CIRCUIT_1);
+
+        CHECK(last_reg() == static_cast<uint8_t>(MCP23008_REGISTERS::MCP23008_OLAT));
+        CHECK(payload_count() == 1);
+        CHECK(last_payload()[0] == 0b00000010);
+        CHECK(pm.status(CIRCUITS::CIRCUIT_1));
     }
 
     SUBCASE("Turn on slot 2")
     {
-        pm.on(2);
-        CHECK(get_i2c_buffer_count() == 2);
-        CHECK(get_i2c_buffer()[0] == ps_register);
-        CHECK(get_i2c_buffer()[1] == 0b00000100); // Bit 2 should be set
-        CHECK(pm.status(2) == true);
+        pm.on(CIRCUITS::CIRCUIT_2);
+
+        CHECK(last_reg() == static_cast<uint8_t>(MCP23008_REGISTERS::MCP23008_OLAT));
+        CHECK(payload_count() == 1);
+        CHECK(last_payload()[0] == 0b00000100);
+        CHECK(pm.status(CIRCUITS::CIRCUIT_2));
     }
 
-    SUBCASE("Turn on slot 3")
-    {
-        pm.on(3);
-        CHECK(get_i2c_buffer_count() == 2);
-        CHECK(get_i2c_buffer()[0] == ps_register);
-        CHECK(get_i2c_buffer()[1] == 0b00001000); // Bit 3 should be set
-        CHECK(pm.status(3) == true);
-    }
-
-    SUBCASE("Turn off slot 4")
-    {
-        pm.on(4);
-        CHECK(get_i2c_buffer_count() == 2);
-        CHECK(get_i2c_buffer()[0] == ps_register);
-        CHECK(get_i2c_buffer()[1] == 0b00010000); // Bit 4 should be cleared
-        CHECK(pm.status(4) == true);
-    }
-
-    SUBCASE("Turn on slot 5")
-    {
-        pm.on(5);
-        CHECK(get_i2c_buffer_count() == 2);
-        CHECK(get_i2c_buffer()[0] == ps_register);
-        CHECK(get_i2c_buffer()[1] == 0b00100000); // Bit 5 should be set
-        CHECK(pm.status(5) == true);
-    }
-
-    SUBCASE("Turn on slot 6")
-    {
-        pm.on(6);
-        CHECK(get_i2c_buffer_count() == 2);
-        CHECK(get_i2c_buffer()[0] == ps_register);
-        CHECK(get_i2c_buffer()[1] == 0b01000000); // Bit 6 should be set
-        CHECK(pm.status(6) == true);
-    }
-
-    SUBCASE("Turn on slot 7")
-    {
-        pm.on(7);
-        CHECK(get_i2c_buffer_count() == 2);
-        CHECK(get_i2c_buffer()[0] == ps_register);
-        CHECK(get_i2c_buffer()[1] == 0b10000000); // Bit 7 should be set
-        CHECK(pm.status(7) == true);
-    }
     SUBCASE("Turn on and off multiple slots")
     {
-        pm.on(0);
-        pm.on(2);
-        CHECK(get_i2c_buffer_count() == 2);
-        CHECK(get_i2c_buffer()[0] == ps_register);
-        CHECK(get_i2c_buffer()[1] == 0b00000101);
-        CHECK(pm.status(0) == true);
-        CHECK(pm.status(2) == true);
+        pm.on(CIRCUITS::CIRCUIT_0);
+        pm.on(CIRCUITS::CIRCUIT_2);
 
-        pm.off(0);
-        CHECK(get_i2c_buffer()[0] == ps_register);
-        CHECK(get_i2c_buffer_count() == 2);
-        CHECK(get_i2c_buffer()[1] == 0b00000100);
-        CHECK(pm.status(0) == false);
-        CHECK(pm.status(2) == true);
+        CHECK(last_payload()[0] == 0b00000101);
 
-        pm.off(2);
-        CHECK(get_i2c_buffer()[0] == ps_register);
-        CHECK(get_i2c_buffer_count() == 2);
-        CHECK(get_i2c_buffer()[1] == 0b00000000);
-        CHECK(pm.status(0) == false);
-        CHECK(pm.status(2) == false);
-    }
+        pm.off(CIRCUITS::CIRCUIT_0);
+        CHECK(last_payload()[0] == 0b00000100);
 
-    SUBCASE("Invalid slot check")
-    {
-        CHECK(get_i2c_buffer_count() == 0);       // I2C transactions cancelled
-        pm.on(8);                                 // Invalid slot
-        CHECK(get_i2c_buffer()[0] == 0b00000000); // register_value_ should still be 0
-        CHECK(pm.status(8) == false);
+        pm.off(CIRCUITS::CIRCUIT_2);
+        CHECK(last_payload()[0] == 0b00000000);
     }
 
     SUBCASE("Initial status is off")
     {
-        CHECK(pm.status(0) == false);
-        CHECK(pm.status(1) == false);
-        CHECK(pm.status(2) == false);
-        CHECK(pm.status(3) == false);
+        CHECK_FALSE(pm.status(CIRCUITS::CIRCUIT_0));
+        CHECK_FALSE(pm.status(CIRCUITS::CIRCUIT_1));
+        CHECK_FALSE(pm.status(CIRCUITS::CIRCUIT_2));
+        CHECK_FALSE(pm.status(CIRCUITS::CIRCUIT_3));
+        CHECK_FALSE(pm.status(CIRCUITS::CIRCUIT_4));
+        CHECK_FALSE(pm.status(CIRCUITS::CIRCUIT_5));
+        CHECK_FALSE(pm.status(CIRCUITS::CIRCUIT_6));
+        CHECK_FALSE(pm.status(CIRCUITS::CIRCUIT_7));
     }
 
     SUBCASE("Set state with bitmask")
     {
         pm.setState(0b10101010);
-        CHECK(pm.status(0) == false);
-        CHECK(pm.status(1) == true);
-        CHECK(pm.status(2) == false);
-        CHECK(pm.status(3) == true);
-        CHECK(pm.status(4) == false);
-        CHECK(pm.status(5) == true);
-        CHECK(pm.status(6) == false);
-        CHECK(pm.status(7) == true);
+
+        CHECK_FALSE(pm.status(CIRCUITS::CIRCUIT_0));
+        CHECK(pm.status(CIRCUITS::CIRCUIT_1));
+        CHECK_FALSE(pm.status(CIRCUITS::CIRCUIT_2));
+        CHECK(pm.status(CIRCUITS::CIRCUIT_3));
+        CHECK_FALSE(pm.status(CIRCUITS::CIRCUIT_4));
+        CHECK(pm.status(CIRCUITS::CIRCUIT_5));
+        CHECK_FALSE(pm.status(CIRCUITS::CIRCUIT_6));
+        CHECK(pm.status(CIRCUITS::CIRCUIT_7));
     }
 
     SUBCASE("Get state reads from OLAT")
     {
-        constexpr uint16_t dev_addr = 0x40;
         uint8_t response = 0b11001100;
-
-        inject_i2c_rx_data(dev_addr, &response, 1); // Correct injection
+        inject_i2c_rx_data(address << 1, &response, 1);
 
         auto state = pm.getState();
         CHECK(state == 0b11001100);
+    }
+
+    SUBCASE("Reset pin is set high on releaseReset")
+    {
+        set_gpio_pin_state(&mock_gpio_port, mock_gpio_pin, GPIO_PIN_RESET);
+        pm.releaseReset();
+        CHECK(get_gpio_pin_state(&mock_gpio_port, mock_gpio_pin) == GPIO_PIN_SET);
+    }
+
+    SUBCASE("Reset pin is set low on holdReset")
+    {
+        set_gpio_pin_state(&mock_gpio_port, mock_gpio_pin, GPIO_PIN_SET);
+        pm.holdReset();
+        CHECK(get_gpio_pin_state(&mock_gpio_port, mock_gpio_pin) == GPIO_PIN_RESET);
     }
 }

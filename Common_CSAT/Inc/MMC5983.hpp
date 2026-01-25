@@ -142,29 +142,21 @@ template <typename Transport>
     requires RegisterModeTransport<Transport>
 bool MMC5983<Transport>::writeRegister(MMC5983_REGISTERS reg, uint8_t value) const
 {
-    uint8_t tx_buf[2] = {static_cast<uint8_t>(reg), value};
-    return transport_.write(tx_buf, sizeof(tx_buf));
+    return transport_.write_reg(static_cast<uint8_t>(reg), &value, 1);
 }
 
 template <typename Transport>
     requires RegisterModeTransport<Transport>
 bool MMC5983<Transport>::readRegisters(MMC5983_REGISTERS reg, uint8_t *rx_buf, uint16_t rx_len) const
 {
-    uint8_t tx_buf[1] = {static_cast<uint8_t>(reg) | MMC5983_READ_BIT};
-    return transport_.write_then_read(tx_buf, sizeof(tx_buf), rx_buf, rx_len);
+    return transport_.read_reg(static_cast<uint8_t>(reg), rx_buf, rx_len);
 }
 
 template <typename Transport>
     requires RegisterModeTransport<Transport>
 bool MMC5983<Transport>::readRegister(MMC5983_REGISTERS reg, uint8_t &value) const
 {
-    uint8_t tx_buf[1] = {static_cast<uint8_t>(reg) | MMC5983_READ_BIT};
-    uint8_t rx_buf[1]{};
-    bool ok = transport_.write_then_read(tx_buf, sizeof(tx_buf), rx_buf, sizeof(rx_buf));
-    if (!ok)
-        return false;
-    value = rx_buf[0];
-    return true;
+    return transport_.read_reg(static_cast<uint8_t>(reg), &value, 1);
 }
 
 template <typename Transport>
@@ -188,15 +180,12 @@ template <typename Transport>
     requires RegisterModeTransport<Transport>
 std::optional<ChipID> MMC5983<Transport>::readChipID() const
 {
-    uint8_t tx_buf = static_cast<uint8_t>(MMC5983_REGISTERS::MMC5983_PRODUCTID) | MMC5983_READ_BIT;
-    uint8_t rx_buf[1];
-
-    if (!transport_.write_then_read(&tx_buf, 1, rx_buf, sizeof(rx_buf)))
+    uint8_t value{};
+    if (!readRegisters(MMC5983_REGISTERS::MMC5983_PRODUCTID, &value, 1))
     {
         return std::nullopt;
     }
-
-    return rx_buf[0];
+    return value;
 }
 
 template <typename Transport>
@@ -212,10 +201,9 @@ template <typename Transport>
     requires RegisterModeTransport<Transport>
 std::optional<MagneticFieldInBodyFrame> MMC5983<Transport>::readMagnetometer() const
 {
-    uint8_t tx_buf = static_cast<uint8_t>(MMC5983_REGISTERS::MMC5983_XOUT0) | MMC5983_READ_BIT;
     uint8_t rx_buf[8]{};
 
-    if (!MMC5983<Transport>::transport_.write_then_read(&tx_buf, 1, rx_buf, sizeof(rx_buf)))
+    if (!readRegisters(MMC5983_REGISTERS::MMC5983_XOUT0, rx_buf, sizeof(rx_buf)))
     {
         return std::nullopt;
     }
@@ -227,10 +215,9 @@ template <typename Transport>
     requires RegisterModeTransport<Transport>
 std::optional<Temperature> MMC5983<Transport>::readThermometer() const
 {
-    uint8_t tx_buf = static_cast<uint8_t>(MMC5983_REGISTERS::MMC5983_TOUT) | MMC5983_READ_BIT;
-    uint8_t rx_buf[1] = {};
+    uint8_t rx_buf[1]{};
 
-    if (!transport_.write_then_read(&tx_buf, 1, rx_buf, sizeof(rx_buf)))
+    if (!readRegisters(MMC5983_REGISTERS::MMC5983_TOUT, rx_buf, sizeof(rx_buf)))
     {
         return std::nullopt;
     }
@@ -242,18 +229,14 @@ template <typename Transport>
     requires RegisterModeTransport<Transport>
 std::array<int32_t, 3> MMC5983<Transport>::readRawMagnetometer() const
 {
-    uint8_t tx_buf = static_cast<uint8_t>(MMC5983_REGISTERS::MMC5983_XOUT0) | MMC5983_READ_BIT;
     uint8_t rx_buf[8]{};
 
-    if (!MMC5983<Transport>::transport_.write_then_read(&tx_buf, 1, rx_buf, sizeof(rx_buf)))
+    if (!readRegisters(MMC5983_REGISTERS::MMC5983_XOUT0, rx_buf, sizeof(rx_buf)))
     {
         memset(rx_buf, 0, sizeof(rx_buf));
     }
 
     return MMC5983Core::parseMagnetometerData(rx_buf);
-//    log(LOG_LEVEL_DEBUG, "SPI: %2x %2x %2x %2x %2x %2x %2x %2x: %ld %ld %ld \r\n",
-//        rx_buf[0], rx_buf[1], rx_buf[2], rx_buf[3], rx_buf[4], rx_buf[5], rx_buf[6], rx_buf[7],
-//        results[0], results[1], results[2]);
 }
 
 template <typename Transport>
@@ -263,10 +246,9 @@ uint8_t MMC5983<Transport>::readRawThermometer() const
     writeRegister(MMC5983_REGISTERS::MMC5983_CONTROL0, 0b10);
     HAL_Delay(5);
 
-    uint8_t tx_buf = static_cast<uint8_t>(MMC5983_REGISTERS::MMC5983_TOUT) | MMC5983_READ_BIT;
     uint8_t rx_buf[1]{};
 
-    if (!transport_.write_then_read(&tx_buf, 1, rx_buf, sizeof(rx_buf)))
+    if (!readRegisters(MMC5983_REGISTERS::MMC5983_TOUT, rx_buf, sizeof(rx_buf)))
     {
         rx_buf[0] = 255;
     }

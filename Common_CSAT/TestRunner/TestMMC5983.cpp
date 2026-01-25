@@ -48,8 +48,8 @@ TEST_CASE("MMC5983Core parseRawMagnetometerData decodes packed buffer")
 SPI_HandleTypeDef mock_spi;
 GPIO_TypeDef mock_gpio;
 
-using Config = SPI_Config<mock_spi, GPIO_PIN_5, 128>;
-using Transport = SPITransport<Config>;
+using Config = SPI_Register_Config<mock_spi, GPIO_PIN_5, 128>;
+using Transport = SPIRegisterTransport<Config>;
 using Magnetometer = MMC5983<Transport>;
 
 TEST_CASE("MMC5983 readChipID returns correct ID")

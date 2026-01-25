@@ -98,7 +98,6 @@ enum class BMI270_REGISTERS : uint8_t
 };
 
 static constexpr uint8_t bmi270_maximum_fifo_config_file[] = {
-	static_cast<uint8_t>(BMI270_REGISTERS::INIT_DATA),
 	0xc8, 0x2e, 0x00, 0x2e, 0x80, 0x2e, 0x1a, 0x00, 0xc8, 0x2e, 0x00, 0x2e, 0xc8, 0x2e, 0x00, 0x2e, 0xc8, 0x2e, 0x00,
 	0x2e, 0xc8, 0x2e, 0x00, 0x2e, 0xc8, 0x2e, 0x00, 0x2e, 0xc8, 0x2e, 0x00, 0x2e, 0x90, 0x32, 0x21, 0x2e, 0x59, 0xf5,
 	0x10, 0x30, 0x21, 0x2e, 0x6a, 0xf5, 0x1a, 0x24, 0x22, 0x00, 0x80, 0x2e, 0x3b, 0x00, 0xc8, 0x2e, 0x44, 0x47, 0x22,
@@ -117,7 +116,7 @@ static constexpr uint8_t bmi270_maximum_fifo_config_file[] = {
 	0x6f, 0x00, 0x2e, 0x00, 0x2e, 0xd0, 0x2e, 0x12, 0x40, 0x52, 0x42, 0x00, 0x2e, 0x12, 0x40, 0x52, 0x42, 0x3e, 0x84,
 	0x00, 0x40, 0x40, 0x42, 0x7e, 0x82, 0xe1, 0x7f, 0xf2, 0x7f, 0x98, 0x2e, 0x6a, 0xd6, 0x21, 0x30, 0x23, 0x2e, 0x61,
 	0xf5, 0xeb, 0x2c, 0xe1, 0x6f};
-static_assert(sizeof(bmi270_maximum_fifo_config_file) == 328 + 1);
+static_assert(sizeof(bmi270_maximum_fifo_config_file) == 328);
 
 struct BMI270_STATUS
 {
@@ -148,13 +147,9 @@ public:
 	uint16_t readRawThermometer() const;
 
 public:
-	// bool auxWriteRegister(BMI270_REGISTERS reg, uint8_t value) const { return writeRegister(reg, value); }
-	// static constexpr uint8_t auxReadBit() { return BMI270_READ_BIT; }
-	// const Transport &transport() const { return transport_; }
-
-public:
-	const Transport& getTransport() const { return transport_; }	
+	const Transport &getTransport() const { return transport_; }
 	bool writeRegister(BMI270_REGISTERS reg, uint8_t value) const;
+	bool writeRegisters(BMI270_REGISTERS reg, const uint8_t *tx_buf, uint16_t tx_len) const;
 	bool readRegister(BMI270_REGISTERS reg, uint8_t &value) const;
 	bool readRegisters(BMI270_REGISTERS reg, uint8_t *rx_buf, uint16_t rx_len) const;
 	bool writeRegisterWithCheck(BMI270_REGISTERS reg, uint8_t value) const;
@@ -215,22 +210,28 @@ template <typename Transport>
 	requires RegisterModeTransport<Transport>
 bool BMI270<Transport>::writeRegister(BMI270_REGISTERS reg, uint8_t value) const
 {
-	uint8_t tx_buf[2] = {static_cast<uint8_t>(reg), value};
-	return transport_.write(tx_buf, sizeof(tx_buf));
+	return transport_.write_reg(static_cast<uint16_t>(reg), &value, 1);
+}
+
+template <typename Transport>
+	requires RegisterModeTransport<Transport>
+bool BMI270<Transport>::writeRegisters(BMI270_REGISTERS reg, const uint8_t *tx_buf, uint16_t tx_len) const
+{
+	return transport_.write_reg(static_cast<uint16_t>(reg), tx_buf, tx_len);
 }
 
 template <typename Transport>
 	requires RegisterModeTransport<Transport>
 bool BMI270<Transport>::readRegisters(BMI270_REGISTERS reg, uint8_t *rx_buf, uint16_t rx_len) const
 {
-	uint8_t tx_buf[1] = {static_cast<uint8_t>(static_cast<uint8_t>(reg) | BMI270_READ_BIT)};
-	return transport_.write_then_read(tx_buf, sizeof(tx_buf), rx_buf, rx_len);
+	return transport_.read_reg(static_cast<uint16_t>(reg) | BMI270_READ_BIT, rx_buf, rx_len);
 }
 
 template <typename Transport>
 	requires RegisterModeTransport<Transport>
 bool BMI270<Transport>::readRegister(BMI270_REGISTERS reg, uint8_t &value) const
 {
+
 	uint8_t rx_buf[2]{};
 	bool ok = readRegisters(reg, rx_buf, sizeof(rx_buf));
 	value = rx_buf[1];
@@ -242,10 +243,14 @@ template <typename Transport>
 bool BMI270<Transport>::writeRegisterWithCheck(BMI270_REGISTERS reg, uint8_t value) const
 {
 	if (!writeRegister(reg, value))
+	{
 		return false;
+	}
 	uint8_t data;
 	if (!readRegister(reg, data))
+	{
 		return false;
+	}
 	return (data == value);
 }
 
@@ -257,7 +262,9 @@ bool BMI270<Transport>::writeRegisterWithRepeat(BMI270_REGISTERS reg, uint8_t va
 	for (uint8_t i = 0; i < N_REPEAT; ++i)
 	{
 		if (writeRegisterWithCheck(reg, value))
+		{
 			return true;
+		}
 	}
 	return false;
 }
@@ -304,7 +311,8 @@ bool BMI270<Transport>::initialize() const
 		writeRegisterWithCheck(BMI270_REGISTERS::INIT_CTRL, 0x00);
 
 		// Transfer the config file, data packet includes INIT_DATA
-		transport_.write(bmi270_maximum_fifo_config_file, sizeof(bmi270_maximum_fifo_config_file));
+		// transport_.write(bmi270_maximum_fifo_config_file, sizeof(bmi270_maximum_fifo_config_file));
+		writeRegisters(BMI270_REGISTERS::INIT_DATA, bmi270_maximum_fifo_config_file, sizeof(bmi270_maximum_fifo_config_file));
 
 		// config is done
 		writeRegisterWithCheck(BMI270_REGISTERS::INIT_CTRL, 1);
@@ -336,17 +344,27 @@ template <typename Transport>
 bool BMI270<Transport>::configure() const
 {
 	if (!writeRegisterWithCheck(BMI270_REGISTERS::ACC_CONF, 0x08))
+	{
 		return false;
+	}
 	if (!writeRegisterWithCheck(BMI270_REGISTERS::ACC_RANGE, 0x00))
+	{
 		return false;
+	}
 
 	if (!writeRegisterWithCheck(BMI270_REGISTERS::GYR_CONF, 0x08))
+	{
 		return false;
+	}
 	if (!writeRegisterWithCheck(BMI270_REGISTERS::GYR_RANGE, 0x00))
+	{
 		return false;
+	}
 
 	if (!writeRegisterWithCheck(BMI270_REGISTERS::PWR_CTRL, BMI270_GYR_EN | BMI270_ACC_EN | BMI270_TMP_EN))
+	{
 		return false;
+	}
 	log(LOG_LEVEL_DEBUG, "BMI270 configured for ACC, GYR, TMP\r\n");
 
 	return true;
@@ -357,19 +375,9 @@ template <typename Transport>
 BMI270_STATUS BMI270<Transport>::readStatus() const
 {
 	BMI270_STATUS s{};
-	uint8_t rx_buf[2]{}; // rx_buf[0] is a dummy byte to give the BMI time to respond
-
-	uint8_t tx_status[1]{static_cast<uint8_t>(BMI270_REGISTERS::STATUS) | BMI270_READ_BIT};
-	transport_.write_then_read(tx_status, sizeof(tx_status), rx_buf, sizeof(rx_buf));
-	s.status = rx_buf[1];
-
-	uint8_t tx_error[1]{static_cast<uint8_t>(BMI270_REGISTERS::ERR_REG) | BMI270_READ_BIT};
-	transport_.write_then_read(tx_error, sizeof(tx_error), rx_buf, sizeof(rx_buf));
-	s.error = rx_buf[1];
-
-	uint8_t tx_internal[1]{static_cast<uint8_t>(BMI270_REGISTERS::INTERNAL_STATUS) | BMI270_READ_BIT};
-	transport_.write_then_read(tx_internal, sizeof(tx_internal), rx_buf, sizeof(rx_buf));
-	s.internal_status = rx_buf[1];
+	readRegister(BMI270_REGISTERS::STATUS, s.status);
+	readRegister(BMI270_REGISTERS::ERR_REG, s.error);
+	readRegister(BMI270_REGISTERS::INTERNAL_STATUS, s.internal_status);
 
 	return s;
 }
@@ -378,25 +386,21 @@ template <typename Transport>
 	requires RegisterModeTransport<Transport>
 std::optional<ChipID> BMI270<Transport>::readChipID() const
 {
-	uint8_t tx_buf[1]{static_cast<uint8_t>(BMI270_REGISTERS::CHIP_ID) | BMI270_READ_BIT};
-	uint8_t rx_buf[2]{}; // rx_buf[0] is a dummy byte to give the BMI time to respond
-
-	if (!transport_.write_then_read(tx_buf, sizeof(tx_buf), rx_buf, sizeof(rx_buf)))
+	uint8_t value{};
+	if (!readRegister(BMI270_REGISTERS::CHIP_ID, value))
 	{
 		return std::nullopt;
 	}
-
-	return rx_buf[1];
+	return value;
 }
 
 template <typename Transport>
 	requires RegisterModeTransport<Transport>
 std::optional<AccelerationInBodyFrame> BMI270<Transport>::readAccelerometer() const
 {
-	uint8_t tx_buf[1] = {static_cast<uint8_t>(BMI270_REGISTERS::ACC_DATA_X_LSB) | BMI270_READ_BIT};
-	uint8_t rx_buf[7]{}; // rx_buf[0] is a dummy byte to give the BMI time to respond
+	uint8_t rx[7]{}; // rx[0] is a dummy byte to give the BMI time to respond
 
-	if (!transport_.write_then_read(tx_buf, sizeof(tx_buf), rx_buf, sizeof(rx_buf)))
+	if (!readRegisters(BMI270_REGISTERS::ACC_DATA_X_LSB, rx, sizeof(rx)))
 	{
 		return std::nullopt;
 	}
@@ -409,19 +413,18 @@ std::optional<AccelerationInBodyFrame> BMI270<Transport>::readAccelerometer() co
 	// down			Z	+9.81
 
 	return AccelerationInBodyFrame{
-		-convertAcc(rx_buf[1], rx_buf[2]),
-		convertAcc(rx_buf[3], rx_buf[4]),
-		convertAcc(rx_buf[5], rx_buf[6])};
+		-convertAcc(rx[1], rx[2]),
+		convertAcc(rx[3], rx[4]),
+		convertAcc(rx[5], rx[6])};
 }
 
 template <typename Transport>
 	requires RegisterModeTransport<Transport>
 std::optional<AngularVelocityInBodyFrame> BMI270<Transport>::readGyroscope() const
 {
-	uint8_t tx_buf[1] = {static_cast<uint8_t>(BMI270_REGISTERS::GYR_DATA_X_LSB) | BMI270_READ_BIT};
-	uint8_t rx_buf[7]{}; // rx_buf[0] is a dummy byte to give the BMI time to respond
+	uint8_t rx[7]{}; // rx[0] is a dummy byte to give the BMI time to respond
 
-	if (!transport_.write_then_read(tx_buf, sizeof(tx_buf), rx_buf, sizeof(rx_buf)))
+	if (!readRegisters(BMI270_REGISTERS::GYR_DATA_X_LSB, rx, sizeof(rx)))
 	{
 		return std::nullopt;
 	}
@@ -434,69 +437,69 @@ std::optional<AngularVelocityInBodyFrame> BMI270<Transport>::readGyroscope() con
 	// down		Z	Yaw		Nose right
 
 	return AngularVelocityInBodyFrame{
-		convertGyr(rx_buf[1], rx_buf[2]),
-		-convertGyr(rx_buf[3], rx_buf[4]),
-		-convertGyr(rx_buf[5], rx_buf[6])};
+		convertGyr(rx[1], rx[2]),
+		-convertGyr(rx[3], rx[4]),
+		-convertGyr(rx[5], rx[6])};
 }
 
 template <typename Transport>
 	requires RegisterModeTransport<Transport>
 std::optional<Temperature> BMI270<Transport>::readThermometer() const
 {
-	uint8_t tx_buf = static_cast<uint8_t>(BMI270_REGISTERS::TMP_DATA_LSB) | BMI270_READ_BIT;
-	uint8_t rx_buf[3]{}; // rx_buf[0] is a dummy byte to give the BMI time to respond
+	uint8_t rx[3]{}; // rx[0] is a dummy byte to give the BMI time to respond
 
-	if (!transport_.write_then_read(&tx_buf, 1, rx_buf, sizeof(rx_buf)))
+	if (!readRegisters(BMI270_REGISTERS::TMP_DATA_LSB, rx, sizeof(rx)))
 	{
 		return std::nullopt;
 	}
 
-	return Temperature{convertTmp(rx_buf[1], rx_buf[2])};
+	return Temperature{convertTmp(rx[1], rx[2])};
 }
 
 template <typename Transport>
 	requires RegisterModeTransport<Transport>
 std::array<int16_t, 3> BMI270<Transport>::readRawAccelerometer() const
 {
-	uint8_t tx_buf[1] = {static_cast<uint8_t>(BMI270_REGISTERS::ACC_DATA_X_LSB) | BMI270_READ_BIT};
-	uint8_t rx_buf[7]{}; // rx_buf[0] is a dummy byte to give the BMI time to respond
+	uint8_t rx[7]{}; // rx[0] is a dummy byte to give the BMI time to respond
 
-	if (!transport_.write_then_read(tx_buf, sizeof(tx_buf), rx_buf, sizeof(rx_buf)))
+	if (!readRegisters(BMI270_REGISTERS::ACC_DATA_X_LSB, rx, sizeof(rx)))
 	{
-		memset(rx_buf, 0xff, 7);
+		memset(rx, 0xFF, sizeof(rx));
 	}
 
-	return std::array<int16_t, 3>{toInt16(rx_buf[1], rx_buf[2]), toInt16(rx_buf[3], rx_buf[4]), toInt16(rx_buf[5], rx_buf[6])};
+	return {toInt16(rx[1], rx[2]),
+			toInt16(rx[3], rx[4]),
+			toInt16(rx[5], rx[6])};
 }
 
 template <typename Transport>
 	requires RegisterModeTransport<Transport>
 std::array<int16_t, 3> BMI270<Transport>::readRawGyroscope() const
 {
-	uint8_t tx_buf[1] = {static_cast<uint8_t>(BMI270_REGISTERS::GYR_DATA_X_LSB) | BMI270_READ_BIT};
-	uint8_t rx_buf[7]{}; // rx_buf[0] is a dummy byte to give the BMI time to respond
+	uint8_t rx[7]{}; // rx[0] is a dummy byte to give the BMI time to respond
 
-	if (!transport_.write_then_read(tx_buf, sizeof(tx_buf), rx_buf, sizeof(rx_buf)))
+	if (!readRegisters(BMI270_REGISTERS::GYR_DATA_X_LSB, rx, sizeof(rx)))
 	{
-		memset(rx_buf, 0, 7);
+		memset(rx, 0, sizeof(rx));
 	}
 
-	return std::array<int16_t, 3>{toInt16(rx_buf[1], rx_buf[2]), toInt16(rx_buf[3], rx_buf[4]), toInt16(rx_buf[5], rx_buf[6])};
+	return {toInt16(rx[1], rx[2]),
+			toInt16(rx[3], rx[4]),
+			toInt16(rx[5], rx[6])};
 }
 
 template <typename Transport>
 	requires RegisterModeTransport<Transport>
 uint16_t BMI270<Transport>::readRawThermometer() const
 {
-	uint8_t tx_buf = static_cast<uint8_t>(BMI270_REGISTERS::TMP_DATA_LSB) | BMI270_READ_BIT;
-	uint8_t rx_buf[3]{}; // rx_buf[0] is a dummy byte to give the BMI time to respond
+	uint8_t rx[3]{}; // rx[0] is a dummy byte to give the BMI time to respond
 
-	if (!transport_.write_then_read(&tx_buf, 1, rx_buf, sizeof(rx_buf)))
+	if (!readRegisters(BMI270_REGISTERS::TMP_DATA_LSB, rx, sizeof(rx)))
 	{
-		memset(rx_buf, 0, 2);
+		memset(rx, 0, sizeof(rx));
 	}
 
-	return toUInt16(rx_buf[1], rx_buf[2]);
+	return toUInt16(rx[1], rx[2]);
 }
 
 #endif /* INC_BMI270_H_ */

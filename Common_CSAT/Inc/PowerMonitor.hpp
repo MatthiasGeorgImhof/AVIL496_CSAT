@@ -7,7 +7,9 @@
 
 #include "Transport.hpp"
 
+#ifdef __linux__
 #include "mock_hal.h"
+#endif
 
 // INA226 I2C Address Options
 enum class INA226_REGISTERS : uint8_t
@@ -127,23 +129,25 @@ private:
 		return static_cast<uint16_t>(value);
 	}
 
-	bool setRegister(INA226_REGISTERS reg, uint16_t value) const
-	{
-		uint8_t tx_buf[3] = {
-			static_cast<uint8_t>(reg),
-			static_cast<uint8_t>((value >> 8) & 0xFF),
-			static_cast<uint8_t>(value & 0xFF)};
-		return transport_.write(tx_buf, sizeof(tx_buf));
-	}
+bool setRegister(INA226_REGISTERS reg, uint16_t value) const
+{
+    uint8_t buf[2] = {
+        static_cast<uint8_t>((value >> 8) & 0xFF),
+        static_cast<uint8_t>(value & 0xFF)
+    };
 
-	bool getRegister(INA226_REGISTERS reg, uint16_t *value) const
-	{
-		uint8_t tx_buf[1] = {static_cast<uint8_t>(reg)};
-		uint8_t rx_buf[2] = {};
-		bool ok = transport_.write_then_read(tx_buf, sizeof(tx_buf), rx_buf, sizeof(rx_buf));
-		*value = (rx_buf[0] << 8) | rx_buf[1];
-		return ok;
-	}
+    return transport_.write_reg(static_cast<uint16_t>(reg), buf, sizeof(buf));
+}
+
+bool getRegister(INA226_REGISTERS reg, uint16_t* value) const
+{
+    uint8_t rx[2] = {};
+
+    bool ok = transport_.read_reg(static_cast<uint16_t>(reg), rx, sizeof(rx));
+    *value = static_cast<uint16_t>((static_cast<uint16_t>(rx[0]) << 8) | static_cast<uint16_t>(rx[1]));
+
+    return ok;
+}
 
 	void delay() { HAL_Delay(1); };
 

@@ -8,8 +8,8 @@
 SPI_HandleTypeDef mock_spi;
 GPIO_TypeDef mock_gpio;
 
-using Config = SPI_Config<mock_spi, GPIO_PIN_5, 128>;
-using Transport = SPITransport<Config>;
+using Config = SPI_Register_Config<mock_spi, GPIO_PIN_5, 128>;
+using Transport = SPIRegisterTransport<Config>;
 using IMUCombo = BMI270_MMC5983<Transport>;
 
 static_assert(HasBodyGyroscope<IMUCombo>, "IMUType does not satisfy HasBodyGyroscope");
@@ -59,9 +59,8 @@ TEST_CASE("BMI270AuxTransport write_then_read shifts dummy byte")
     BMI270<Transport> bmi(transport);
     BMI270AuxTransport<BMI270<Transport>> aux(bmi);
 
-    uint8_t tx[] = {static_cast<uint8_t>(MMC5983_REGISTERS::MMC5983_XOUT0)};
     uint8_t rx[3] = {};
-    auto ok = aux.write_then_read(tx, 1, rx, sizeof(rx));
+    auto ok = aux.read_reg(static_cast<uint8_t>(MMC5983_REGISTERS::MMC5983_XOUT0), rx, sizeof(rx));
     CHECK(ok == true);
 
     // Check shifted result

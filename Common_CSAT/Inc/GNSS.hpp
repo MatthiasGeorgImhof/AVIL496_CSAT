@@ -91,7 +91,7 @@ enum UBXMessageID : uint8_t
 };
 
 template <typename Transport>
-	requires StreamTransport<Transport>
+	requires StreamAccessTransport<Transport>
 class GNSS
 {
 public:
@@ -148,7 +148,7 @@ private:
  * @param GNSS Pointer to main GNSS structure.
  */
 template <typename Transport>
-	requires StreamTransport<Transport>
+	requires StreamAccessTransport<Transport>
 uint8_t *GNSS<Transport>::findHeader(UBXClass classID, UBXMessageID messageID)
 {
 	constexpr uint16_t SIZE = sizeof(uart_buffer) / 2;
@@ -175,16 +175,16 @@ uint8_t *GNSS<Transport>::findHeader(UBXClass classID, UBXMessageID messageID)
 }
 
 template <typename Transport>
-	requires StreamTransport<Transport>
+	requires StreamAccessTransport<Transport>
 uint8_t *GNSS<Transport>::request(const uint8_t *request, uint16_t size, UBXClass classID, UBXMessageID messageID)
 {
-	transport_.send(const_cast<uint8_t *>(request), size);
-	transport_.receive(uart_buffer, sizeof(uart_buffer));
+	transport_.write(const_cast<uint8_t *>(request), size);
+	transport_.read(uart_buffer, sizeof(uart_buffer));
 	return findHeader(classID, messageID);
 }
 
 template <typename Transport>
-	requires StreamTransport<Transport>
+	requires StreamAccessTransport<Transport>
 std::optional<UniqueID> GNSS<Transport>::getUniqID()
 {
 	uint8_t *messageBuffer = request(GNSSCore::GET_UNIQUE_ID, sizeof(GNSSCore::GET_UNIQUE_ID), UBXClass::MON, UBXMessageID::UNIQ_ID);
@@ -197,7 +197,7 @@ std::optional<UniqueID> GNSS<Transport>::getUniqID()
  * Make request for UTC time solution data.
  */
 template <typename Transport>
-	requires StreamTransport<Transport>
+	requires StreamAccessTransport<Transport>
 std::optional<UTCTime> GNSS<Transport>::getNavTimeUTC()
 {
 	uint8_t *messageBuffer = request(GNSSCore::GET_NAV_TIME_UTC, sizeof(GNSSCore::GET_NAV_TIME_UTC), UBXClass::NAV, UBXMessageID::UTC_TIME);
@@ -210,7 +210,7 @@ std::optional<UTCTime> GNSS<Transport>::getNavTimeUTC()
  * Make request for geodetic position solution data.
  */
 template <typename Transport>
-	requires StreamTransport<Transport>
+	requires StreamAccessTransport<Transport>
 std::optional<PositionLLH> GNSS<Transport>::getNavPosLLH()
 {
 	uint8_t *messageBuffer = request(GNSSCore::GET_NAV_POS_LLH, sizeof(GNSSCore::GET_NAV_POS_LLH), UBXClass::NAV, UBXMessageID::POS_LLH);
@@ -223,7 +223,7 @@ std::optional<PositionLLH> GNSS<Transport>::getNavPosLLH()
  * Make request for earth centric position solution data.
  */
 template <typename Transport>
-	requires StreamTransport<Transport>
+	requires StreamAccessTransport<Transport>
 std::optional<PositionECEF> GNSS<Transport>::getNavPosECEF()
 {
 	uint8_t *messageBuffer = request(GNSSCore::GET_NAV_POS_ECEF, sizeof(GNSSCore::GET_NAV_POS_ECEF), UBXClass::NAV, UBXMessageID::POS_ECEF);
@@ -236,7 +236,7 @@ std::optional<PositionECEF> GNSS<Transport>::getNavPosECEF()
  * Make request for navigation position velocity time solution data.
  */
 template <typename Transport>
-	requires StreamTransport<Transport>
+	requires StreamAccessTransport<Transport>
 std::optional<NavigationPVT> GNSS<Transport>::getNavPVT()
 {
 	uint8_t *messageBuffer = request(GNSSCore::GET_NAV_PVT, sizeof(GNSSCore::GET_NAV_PVT), UBXClass::NAV, UBXMessageID::PVT);
@@ -249,7 +249,7 @@ std::optional<NavigationPVT> GNSS<Transport>::getNavPVT()
  * Make request for geocentric navigation velocity solution data.
  */
 template <typename Transport>
-	requires StreamTransport<Transport>
+	requires StreamAccessTransport<Transport>
 std::optional<VelocityNED> GNSS<Transport>::getNavVelNED()
 {
 	uint8_t *messageBuffer = request(GNSSCore::GET_NAV_VEL_NED, sizeof(GNSSCore::GET_NAV_VEL_NED), UBXClass::NAV, UBXMessageID::VEL_NED);
@@ -262,7 +262,7 @@ std::optional<VelocityNED> GNSS<Transport>::getNavVelNED()
  * Make request for earth centric navigation velocity solution data.
  */
 template <typename Transport>
-	requires StreamTransport<Transport>
+	requires StreamAccessTransport<Transport>
 std::optional<VelocityECEF> GNSS<Transport>::getNavVelECEF()
 {
 	uint8_t *messageBuffer = request(GNSSCore::GET_NAV_VEL_ECEF, sizeof(GNSSCore::GET_NAV_VEL_ECEF), UBXClass::NAV, UBXMessageID::VEL_ECEF);
@@ -275,7 +275,7 @@ std::optional<VelocityECEF> GNSS<Transport>::getNavVelECEF()
  * Changing the GNSS mode.
  */
 template <typename Transport>
-	requires StreamTransport<Transport>
+	requires StreamAccessTransport<Transport>
 void GNSS<Transport>::setMode(GNSSMode gnssMode)
 {
 	uint8_t *dataToSend = nullptr;
@@ -329,7 +329,7 @@ void GNSS<Transport>::setMode(GNSSMode gnssMode)
 
 	if (dataToSend != nullptr)
 	{
-		transport_.send(dataToSend, static_cast<uint16_t>(dataSize));
+		transport_.write(dataToSend, static_cast<uint16_t>(dataSize));
 	}
 }
 
@@ -337,14 +337,14 @@ void GNSS<Transport>::setMode(GNSSMode gnssMode)
  *  Sends the basic configuration: Activation of the UBX standard, change of NMEA version to 4.10 and turn on of the Galileo system.
  */
 template <typename Transport>
-	requires StreamTransport<Transport>
+	requires StreamAccessTransport<Transport>
 void GNSS<Transport>::loadConfig()
 {
-	transport_.send(const_cast<uint8_t *>(GNSSCore::CONFIG_UBX), sizeof(GNSSCore::CONFIG_UBX));
+	transport_.write(const_cast<uint8_t *>(GNSSCore::CONFIG_UBX), sizeof(GNSSCore::CONFIG_UBX));
 	HAL_Delay(250);
-	transport_.send(const_cast<uint8_t *>(GNSSCore::SET_NMEA_410), sizeof(GNSSCore::SET_NMEA_410));
+	transport_.write(const_cast<uint8_t *>(GNSSCore::SET_NMEA_410), sizeof(GNSSCore::SET_NMEA_410));
 	HAL_Delay(250);
-	transport_.send(const_cast<uint8_t *>(GNSSCore::SET_GNSS), sizeof(GNSSCore::SET_GNSS));
+	transport_.write(const_cast<uint8_t *>(GNSSCore::SET_GNSS), sizeof(GNSSCore::SET_GNSS));
 	HAL_Delay(250);
 }
 

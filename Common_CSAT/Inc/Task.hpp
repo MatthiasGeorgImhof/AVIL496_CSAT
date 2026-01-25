@@ -94,14 +94,22 @@ protected:
 	{
 		int8_t result = serialize(data, payload, &payload_size);
 		if (result < 0)
-			log(LOG_LEVEL_ERROR, "ERROR Task.publish serialization %d\r\n", result);
-
+		{
+			log(LOG_LEVEL_ERROR, "ERROR Task.publish serialization result %d with size %d \r\n", result, payload_size);
+			return;
+		}
+		else
+		{
+			log(LOG_LEVEL_DEBUG, "Task.publish serialization result %d with size %d \r\n", result, payload_size);
+		}
 		CyphalTransferMetadata metadata =
 			{
 				CyphalPriorityNominal,
 				transfer_kind,
 				port_id,
 				node_id,
+				CYPHAL_NODE_ID_UNSET,
+				CYPHAL_NODE_ID_UNSET,
 				transfer_id,
 			};
 

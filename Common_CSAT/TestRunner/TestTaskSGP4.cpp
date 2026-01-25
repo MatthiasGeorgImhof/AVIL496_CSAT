@@ -17,7 +17,9 @@
 #include "loopard_adapter.hpp"
 #include "RegistrationManager.hpp"
 #include "ServiceManager.hpp"
-#include "Allocator.hpp"
+#include "HeapAllocation.hpp"
+
+using Heap = HeapAllocation<>;
 
 TEST_CASE("duration_in_fractional_days - Basic")
 {
@@ -109,9 +111,6 @@ TEST_CASE("duration_in_fractional_days - Millisecond Precision")
     CHECK(TimeUtils::to_fractional_days(tp_start, tp_end) == doctest::Approx(500.0f / (24.0f * 3600.0f * 1000.0f)));
 }
 
-void *loopardMemoryAllocate(size_t amount) { return static_cast<void *>(malloc(amount)); };
-void loopardMemoryFree(void *pointer) { free(pointer); };
-
 TEST_CASE("receive one TLE")
 {
     RTC_HandleTypeDef hrtc;
@@ -119,10 +118,12 @@ TEST_CASE("receive one TLE")
 
     constexpr CyphalNodeID id = 11;
 
+    Heap::initialize();
+
     // Create adapters
     LoopardAdapter loopard;
-    loopard.memory_allocate = loopardMemoryAllocate;
-    loopard.memory_free = loopardMemoryFree;
+    loopard.memory_allocate = Heap::loopardMemoryAllocate;
+    loopard.memory_free = Heap::loopardMemoryDeallocate;
     Cyphal<LoopardAdapter> loopard_cyphal(&loopard);
     loopard_cyphal.setNodeID(id);
     std::tuple<Cyphal<LoopardAdapter>> adapters(loopard_cyphal);
@@ -186,10 +187,12 @@ TEST_CASE("receive two TLE")
 
     constexpr CyphalNodeID id = 11;
 
+    Heap::initialize();
+
     // Create adapters
     LoopardAdapter loopard;
-    loopard.memory_allocate = loopardMemoryAllocate;
-    loopard.memory_free = loopardMemoryFree;
+    loopard.memory_allocate = Heap::loopardMemoryAllocate;
+    loopard.memory_free = Heap::loopardMemoryDeallocate;
     Cyphal<LoopardAdapter> loopard_cyphal(&loopard);
     loopard_cyphal.setNodeID(id);
     std::tuple<Cyphal<LoopardAdapter>> adapters(loopard_cyphal);
@@ -291,10 +294,12 @@ TEST_CASE("send position 2025 6 25 18 0 0")
 
     constexpr CyphalNodeID id = 11;
 
+    Heap::initialize();
+
     // Create adapters
     LoopardAdapter loopard;
-    loopard.memory_allocate = loopardMemoryAllocate;
-    loopard.memory_free = loopardMemoryFree;
+    loopard.memory_allocate = Heap::loopardMemoryAllocate;
+    loopard.memory_free = Heap::loopardMemoryDeallocate;
     Cyphal<LoopardAdapter> loopard_cyphal(&loopard);
     loopard_cyphal.setNodeID(id);
     std::tuple<Cyphal<LoopardAdapter>> adapters(loopard_cyphal);
@@ -354,7 +359,7 @@ TEST_CASE("send position 2025 6 25 18 0 0")
     CHECK(received_data.velocity_ecef.meter_per_second[0] == doctest::Approx(expected_v[0]*1000.0f).epsilon(0.01));
     CHECK(received_data.velocity_ecef.meter_per_second[1] == doctest::Approx(expected_v[1]*1000.0f).epsilon(0.01));
     CHECK(received_data.velocity_ecef.meter_per_second[2] == doctest::Approx(expected_v[2]*1000.0f).epsilon(0.01));
-    loopardMemoryFree(transfer.payload);
+    Heap::loopardMemoryDeallocate(transfer.payload);
 }
 
 TEST_CASE("send position 2025 7 6 20 43 13")
@@ -378,10 +383,12 @@ TEST_CASE("send position 2025 7 6 20 43 13")
 
     constexpr CyphalNodeID id = 11;
 
+    Heap::initialize();
+
     // Create adapters
     LoopardAdapter loopard;
-    loopard.memory_allocate = loopardMemoryAllocate;
-    loopard.memory_free = loopardMemoryFree;
+    loopard.memory_allocate = Heap::loopardMemoryAllocate;
+    loopard.memory_free = Heap::loopardMemoryDeallocate;
     Cyphal<LoopardAdapter> loopard_cyphal(&loopard);
     loopard_cyphal.setNodeID(id);
     std::tuple<Cyphal<LoopardAdapter>> adapters(loopard_cyphal);
@@ -441,5 +448,5 @@ TEST_CASE("send position 2025 7 6 20 43 13")
     CHECK(received_data.velocity_ecef.meter_per_second[0] == doctest::Approx(expected_v[0] * 1000.f).epsilon(0.01));
     CHECK(received_data.velocity_ecef.meter_per_second[1] == doctest::Approx(expected_v[1] * 1000.f).epsilon(0.01));
     CHECK(received_data.velocity_ecef.meter_per_second[2] == doctest::Approx(expected_v[2] * 1000.f).epsilon(0.01));
-    loopardMemoryFree(transfer.payload);
+    Heap::loopardMemoryDeallocate(transfer.payload);
 }

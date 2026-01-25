@@ -8,8 +8,8 @@
 SPI_HandleTypeDef mock_spi;
 GPIO_TypeDef mock_gpio;
 
-using Config = SPI_Config<mock_spi, GPIO_PIN_5, 128>;
-using Transport = SPITransport<Config>;
+using Config = SPI_Stream_Config<mock_spi, GPIO_PIN_5, 128>;
+using Transport = SPIStreamTransport<Config>;
 using SRAM = MR25H10<Transport>;
 
 TEST_CASE("MR25H10 readStatus returns correct value") {
@@ -39,6 +39,6 @@ TEST_CASE("MR25H10 writeStatus sends correct command and data") {
 
     auto tx = get_spi_tx_buffer();
     CHECK(get_spi_tx_buffer_count() == 2);
-    CHECK(tx[0] == static_cast<uint8_t>(MR25H10_REGISTERS::MR25H10_WRSR));
+    CHECK(tx[0] == static_cast<uint8_t>(MR25H10_COMMANDS::MR25H10_WRSR));
     CHECK(tx[1] == status);
 }

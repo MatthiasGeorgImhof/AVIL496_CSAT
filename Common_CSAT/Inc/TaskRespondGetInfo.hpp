@@ -47,7 +47,7 @@ void TaskRespondGetInfo<Adapters...>::handleTaskImpl()
             log(LOG_LEVEL_ERROR, "TaskRespondGetInfo Error: %4d %4d\r\n",
             		transfer->metadata.remote_node_id,
 					transfer->metadata.transfer_kind);
-            return;
+            continue;
         }
         uavcan_node_GetInfo_Response_1_0 data = {
             .protocol_version = {uavcan_node_Version_1_0{.major = 1, .minor = 0}},

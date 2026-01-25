@@ -54,7 +54,7 @@ void TaskRequestGetInfo<Adapters...>::handleTaskImpl()
             		TaskRequestGetInfo<Adapters...>::node_id_,
 					transfer->metadata.remote_node_id,
 					transfer->metadata.transfer_kind);
-            return;
+            continue;
         }
         
         uavcan_node_GetInfo_Response_1_0 data;
@@ -64,7 +64,7 @@ void TaskRequestGetInfo<Adapters...>::handleTaskImpl()
         if (deserialization_result < 0)
         {
             log(LOG_LEVEL_ERROR, "TaskRequestGetInfo: Deserialization Error\r\n");
-            return;
+            continue;
         }
 
         log(LOG_LEVEL_DEBUG, "TaskRequestGetInfo: received response from %4d\r\n", transfer->metadata.remote_node_id);

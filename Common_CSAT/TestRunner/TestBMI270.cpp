@@ -8,8 +8,8 @@
 SPI_HandleTypeDef mock_spi;
 GPIO_TypeDef mock_gpio;
 
-using Config = SPI_Config<mock_spi, GPIO_PIN_5, 128>;
-using Transport = SPITransport<Config>;
+using Config = SPI_Register_Config<mock_spi, GPIO_PIN_5, 128>;
+using Transport = SPIRegisterTransport<Config>;
 using IMUType = BMI270<Transport>;
 
 static_assert(ProvidesChipID<IMUType>);
@@ -252,34 +252,207 @@ TEST_CASE("BMI270 readRawThermometer() returns correct raw thermometer value") {
     CHECK(result == 512);
 }
 
-// TEST_CASE("BMI270 auxWriteRegister() writes the correct register and value") {
-//     clear_spi_tx_buffer();
+TEST_CASE("BMI270 writeRegister writes correct register and value")
+{
+    clear_spi_tx_buffer();
 
-//     Config config(&mock_gpio);
-//     Transport transport(config);
-//     BMI270<Transport> imu(transport);
+    Config config(&mock_gpio);
+    Transport transport(config);
+    BMI270<Transport> imu(transport);
 
-//     BMI270_REGISTERS reg = BMI270_REGISTERS::ACC_CONF;
-//     uint8_t value = 0x0A;
+    imu.writeRegister(BMI270_REGISTERS::ACC_CONF, 0x55);
 
-//     imu.auxWriteRegister(reg, value);
+    REQUIRE(get_spi_tx_buffer_count() == 2);
+    CHECK(get_spi_tx_buffer()[0] == static_cast<uint8_t>(BMI270_REGISTERS::ACC_CONF));
+    CHECK(get_spi_tx_buffer()[1] == 0x55);
+}
 
-//     // Verify that the correct SPI transaction occurred
-//     const auto& transactions = get_spi_tx_buffer();
-//     REQUIRE(get_spi_tx_buffer_count() == 2); // Expect 2 bytes in the transaction
-//     CHECK(transactions[0] == static_cast<uint8_t>(reg));
-//     CHECK(transactions[1] == value);
-// }
+TEST_CASE("BMI270 readRegister reads correct value after dummy byte")
+{
+    clear_spi_rx_buffer();
 
-// TEST_CASE("BMI270 transport() returns the correct transport instance")
-// {
-//     Config config(&mock_gpio);
-//     Transport transport(config);
-//     BMI270<Transport> imu(transport);
+    uint8_t raw[] = {0xFF, 0xAB};   // dummy + value
+    inject_spi_rx_data(raw, sizeof(raw));
 
-//     const Transport& returned_transport = imu.transport();
-//     // This checks that the returned transport object refers to the same memory location
-//     // as the original transport object. If they are the same, it confirms that the
-//     // transport() method correctly returns a reference to the internal transport object.
-//     CHECK(&returned_transport == &transport);
-// }
+    Config config(&mock_gpio);
+    Transport transport(config);
+    BMI270<Transport> imu(transport);
+
+    uint8_t v = 0;
+    CHECK(imu.readRegister(BMI270_REGISTERS::ACC_RANGE, v) == true);
+    CHECK(v == 0xAB);
+}
+
+TEST_CASE("BMI270 readRegisters reads dummy + payload correctly")
+{
+    clear_spi_rx_buffer();
+
+    uint8_t raw[] = {0xFF, 0x11, 0x22, 0x33};
+    inject_spi_rx_data(raw, sizeof(raw));
+
+    Config config(&mock_gpio);
+    Transport transport(config);
+    BMI270<Transport> imu(transport);
+
+    uint8_t rx[4] = {};
+    CHECK(imu.readRegisters(BMI270_REGISTERS::ACC_DATA_X_LSB, rx, sizeof(rx)) == true);
+
+    CHECK(rx[0] == 0xFF);
+    CHECK(rx[1] == 0x11);
+    CHECK(rx[2] == 0x22);
+    CHECK(rx[3] == 0x33);
+}
+
+TEST_CASE("BMI270 writeRegisterWithCheck succeeds when readback matches")
+{
+    clear_spi_tx_buffer();
+    clear_spi_rx_buffer();
+
+    uint8_t raw[] = {0xFF, 0x77};   // dummy + readback
+    inject_spi_rx_data(raw, sizeof(raw));
+
+    Config config(&mock_gpio);
+    Transport transport(config);
+    BMI270<Transport> imu(transport);
+
+    CHECK(imu.writeRegisterWithCheck(BMI270_REGISTERS::GYR_CONF, 0x77) == true);
+}
+
+TEST_CASE("BMI270 writeRegisterWithCheck fails when readback mismatches")
+{
+    clear_spi_tx_buffer();
+    clear_spi_rx_buffer();
+
+    uint8_t raw[] = {0xFF, 0x00};   // dummy + wrong value
+    inject_spi_rx_data(raw, sizeof(raw));
+
+    Config config(&mock_gpio);
+    Transport transport(config);
+    BMI270<Transport> imu(transport);
+
+    CHECK(imu.writeRegisterWithCheck(BMI270_REGISTERS::GYR_CONF, 0x77) == false);
+}
+
+TEST_CASE("BMI270 writeRegisterWithRepeat retries until success")
+{
+    clear_spi_tx_buffer();
+    clear_spi_rx_buffer();
+
+    // First 3 attempts fail, 4th succeeds
+    uint8_t raw[] = {
+        0xFF, 0x00,   // fail
+        0xFF, 0x00,   // fail
+        0xFF, 0x00,   // fail
+        0xFF, 0x55    // success
+    };
+    inject_spi_rx_data(raw, sizeof(raw));
+
+    Config config(&mock_gpio);
+    Transport transport(config);
+    BMI270<Transport> imu(transport);
+
+    CHECK(imu.writeRegisterWithRepeat(BMI270_REGISTERS::ACC_RANGE, 0x55) == true);
+}
+
+TEST_CASE("BMI270 writeRegisterWithRepeat fails after all retries")
+{
+    clear_spi_tx_buffer();
+    clear_spi_rx_buffer();
+
+    uint8_t raw[16];
+    for (int i = 0; i < 16; i += 2)
+    {
+        raw[i] = 0xFF;     // dummy
+        raw[i+1] = 0x00;   // always wrong
+    }
+    inject_spi_rx_data(raw, sizeof(raw));
+
+    Config config(&mock_gpio);
+    Transport transport(config);
+    BMI270<Transport> imu(transport);
+
+    CHECK(imu.writeRegisterWithRepeat(BMI270_REGISTERS::ACC_RANGE, 0x55) == false);
+}
+
+TEST_CASE("BMI270 configure succeeds when all register writes succeed")
+{
+    clear_spi_tx_buffer();
+    clear_spi_rx_buffer();
+
+    // Every readback matches
+    uint8_t raw[] = {
+        0xFF, 0x08,   // ACC_CONF
+        0xFF, 0x00,   // ACC_RANGE
+        0xFF, 0x08,   // GYR_CONF
+        0xFF, 0x00,   // GYR_RANGE
+        0xFF, 0x0E    // PWR_CTRL
+    };
+    inject_spi_rx_data(raw, sizeof(raw));
+
+    Config config(&mock_gpio);
+    Transport transport(config);
+    BMI270<Transport> imu(transport);
+
+    CHECK(imu.configure() == true);
+}
+
+TEST_CASE("BMI270 configure fails when a register write fails")
+{
+    clear_spi_tx_buffer();
+    clear_spi_rx_buffer();
+
+    // First readback OK, second wrong
+    uint8_t raw[] = {
+        0xFF, 0x08,   // ACC_CONF OK
+        0xFF, 0xFF    // ACC_RANGE wrong
+    };
+    inject_spi_rx_data(raw, sizeof(raw));
+
+    Config config(&mock_gpio);
+    Transport transport(config);
+    BMI270<Transport> imu(transport);
+
+    CHECK(imu.configure() == false);
+}
+
+TEST_CASE("BMI270 initialize succeeds when chip ID matches and status OK")
+{
+    clear_spi_rx_buffer();
+
+    uint8_t raw[] = {
+        0xFF, 0x00,   // CHIP_ID dummy read
+        0xFF, 0xB6,   // readback for CMD writeRegisterWithCheck
+        0xFF, 0x24,   // CHIP_ID after reset
+        0xFF, 0x24,   // CHIP_ID again
+        0xFF, 0x00,   // readback for PWR_CONF
+        0xFF, 0x00,   // readback for INIT_CTRL=0
+        0xFF, 0x01,   // readback for INIT_CTRL=1
+        0xFF, 0x01    // INTERNAL_STATUS OK
+    };
+    inject_spi_rx_data(raw, sizeof(raw));
+
+    Config config(&mock_gpio);
+    Transport transport(config);
+    BMI270<Transport> imu(transport);
+
+    CHECK(imu.initialize() == true);
+}
+
+TEST_CASE("BMI270 initialize fails when chip ID never matches")
+{
+    clear_spi_rx_buffer();
+
+    uint8_t raw[64];
+    for (int i = 0; i < 64; i += 2)
+    {
+        raw[i] = 0xFF;
+        raw[i+1] = 0x00;   // wrong chip ID
+    }
+    inject_spi_rx_data(raw, sizeof(raw));
+
+    Config config(&mock_gpio);
+    Transport transport(config);
+    BMI270<Transport> imu(transport);
+
+    CHECK(imu.initialize() == false);
+}

@@ -13,4 +13,6 @@
 #define HAS_UART_HANDLE_TYPEDEF
 #endif
 
+#define HAS_SCCB
+
 #endif // __TRANSPORT_CONFIG_H__
