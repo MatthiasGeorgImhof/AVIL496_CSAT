@@ -25,7 +25,7 @@
 
 #include <CircularBuffer.hpp>
 #include <ArrayList.hpp>
-#include "Allocator.hpp"
+#include "HeapAllocation.hpp"
 #include "RegistrationManager.hpp"
 #include "ServiceManager.hpp"
 #include "SubscriptionManager.hpp"
@@ -59,28 +59,10 @@
 #include "Logger.hpp"
 
 constexpr size_t O1HEAP_SIZE = 65536;
-uint8_t o1heap_buffer[O1HEAP_SIZE] __attribute__ ((aligned (O1HEAP_ALIGNMENT)));
-O1HeapInstance *o1heap;
+using LocalHeap = HeapAllocation<O1HEAP_SIZE>;
 
-void* canardMemoryAllocate(CanardInstance *const /*canard*/, const size_t size)
-{
-	return o1heapAllocate(o1heap, size);
-}
-
-void canardMemoryDeallocate(CanardInstance *const /*canard*/, void *const pointer)
-{
-	o1heapFree(o1heap, pointer);
-}
-
-void* serardMemoryAllocate(void *const /*user_reference*/, const size_t size)
-{
-	return o1heapAllocate(o1heap, size);
-}
-
-void serardMemoryDeallocate(void *const /*user_reference*/, const size_t /*size*/, void *const pointer)
-{
-	o1heapFree(o1heap, pointer);
-};
+CanardAdapter canard_adapter;
+LoopardAdapter loopard_adapter;
 
 #ifndef CYPHAL_NODE_ID
 #define CYPHAL_NODE_ID 31
@@ -116,19 +98,18 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
 	}
 }
 
-uint16_t endian_swap(uint16_t num) {return (num>>8) | (num<<8); };
-int16_t endian_swap(int16_t num) {return (num>>8) | (num<<8); };
+constexpr uint16_t endian_swap(uint16_t num) {return (num>>8) | (num<<8); };
+constexpr int16_t endian_swap(int16_t num) {return (num>>8) | (num<<8); };
+
+template<typename T, typename... Args>
+static void register_task_with_heap(RegistrationManager& rm, Args&&... args)
+{
+    static SafeAllocator<T, LocalHeap> alloc;
+    rm.add(alloc_unique_custom<T>(alloc, std::forward<Args>(args)...));
+}
 
 void cppmain()
 {
-	HAL_GPIO_WritePin(GPIOC, GPIO_POWER_RST_Pin, GPIO_PIN_SET);
-	constexpr uint8_t GPIO_EXPANDER = 32;
-	using SwitchConfig = I2C_Config<hi2c2, GPIO_EXPANDER>;
-    using SwitchTransport = I2CTransport<SwitchConfig>;
-    SwitchTransport switch_transport;
-    PowerSwitch<SwitchTransport> power_switch(switch_transport);
-    power_switch.setState(0x00);
-
 	if (HAL_CAN_Start(&hcan1) != HAL_OK) {
 		Error_Handler();
 	}
@@ -150,127 +131,139 @@ void cppmain()
 	filter.SlaveStartFilterBank = 0;
 	HAL_CAN_ConfigFilter(&hcan1, &filter);
 
-	o1heap = o1heapInit(o1heap_buffer, O1HEAP_SIZE);
-	O1HeapAllocator<CanardRxTransfer> alloc(o1heap);
+	LocalHeap::initialize();
+	O1HeapInstance *o1heap = LocalHeap::getO1Heap();
 
-	LoopardAdapter loopard_adapter;
-	Cyphal<LoopardAdapter> loopard_cyphal(&loopard_adapter);
+	using LoopardCyphal = Cyphal<LoopardAdapter>;
+	loopard_adapter.memory_allocate = LocalHeap::loopardMemoryAllocate;
+	loopard_adapter.memory_free = LocalHeap::loopardMemoryDeallocate;
+	LoopardCyphal loopard_cyphal(&loopard_adapter);
 	loopard_cyphal.setNodeID(cyphal_node_id);
 
-	CanardAdapter canard_adapter;
-	canard_adapter.ins = canardInit(&canardMemoryAllocate, &canardMemoryDeallocate);
+	using CanardCyphal = Cyphal<CanardAdapter>;
+	canard_adapter.ins = canardInit(LocalHeap::canardMemoryAllocate, LocalHeap::canardMemoryDeallocate);
 	canard_adapter.que = canardTxInit(512, CANARD_MTU_CAN_CLASSIC);
-	Cyphal<CanardAdapter> canard_cyphal(&canard_adapter);
+	CanardCyphal canard_cyphal(&canard_adapter);
 	canard_cyphal.setNodeID(cyphal_node_id);
 
-//	Logger::setCyphalCanardAdapter(&canard_cyphal);
-	std::tuple<Cyphal<CanardAdapter>> canard_adapters = { canard_cyphal };
+	//	Logger::setCyphalCanardAdapter(&canard_cyphal);
+	std::tuple<CanardCyphal> canard_adapters = { canard_cyphal };
 	std::tuple<> empty_adapters = {} ;
 
 	RegistrationManager registration_manager;
 	SubscriptionManager subscription_manager;
-	registration_manager.subscribe(uavcan_node_Heartbeat_1_0_FIXED_PORT_ID_);
-	registration_manager.subscribe(uavcan_node_port_List_1_0_FIXED_PORT_ID_);
-	registration_manager.subscribe(uavcan_diagnostic_Record_1_1_FIXED_PORT_ID_);
-	registration_manager.publish(uavcan_node_Heartbeat_1_0_FIXED_PORT_ID_);
-	registration_manager.publish(uavcan_node_port_List_1_0_FIXED_PORT_ID_);
-	registration_manager.publish(uavcan_diagnostic_Record_1_1_FIXED_PORT_ID_);
 
-	O1HeapAllocator<TaskSendHeartBeat<Cyphal<CanardAdapter>>> alloc_TaskSendHeartBeat(o1heap);
-	registration_manager.add(allocate_unique_custom<TaskSendHeartBeat<Cyphal<CanardAdapter>>>(alloc_TaskSendHeartBeat, 2000, 100, 0, canard_adapters));
+//	constexpr auto ACS_LOGIC_3V3 = CIRCUITS::CIRCUIT_0;
+//	constexpr auto MRAM_3V3 = CIRCUITS::CIRCUIT_1;
+//	constexpr auto GYRO_3V3 = CIRCUITS::CIRCUIT_2;
+//	constexpr auto CLK_3V3 = CIRCUITS::CIRCUIT_3;
+//	constexpr auto TEMP_3V3 = CIRCUITS::CIRCUIT_4;
+//	constexpr auto MAG_3V3 = CIRCUITS::CIRCUIT_5;
+//	constexpr auto SUN_3V3 = CIRCUITS::CIRCUIT_6;
+//	constexpr auto GPS_3V3 = CIRCUITS::CIRCUIT_7;
 
-	O1HeapAllocator<TaskProcessHeartBeat<Cyphal<CanardAdapter>>> alloc_TaskProcessHeartBeat(o1heap);
-	registration_manager.add(allocate_unique_custom<TaskProcessHeartBeat<Cyphal<CanardAdapter>>>(alloc_TaskProcessHeartBeat, 2000, 100, canard_adapters));
-
-	O1HeapAllocator<TaskSendNodePortList<Cyphal<CanardAdapter>>> alloc_TaskSendNodePortList(o1heap);
-	registration_manager.add(allocate_unique_custom<TaskSendNodePortList<Cyphal<CanardAdapter>>>(alloc_TaskSendNodePortList, &registration_manager, 10000, 100, 0, canard_adapters));
-
-	O1HeapAllocator<TaskSubscribeNodePortList<Cyphal<CanardAdapter>>> alloc_TaskSubscribeNodePortList(o1heap);
-	registration_manager.add(allocate_unique_custom<TaskSubscribeNodePortList<Cyphal<CanardAdapter>>>(alloc_TaskSubscribeNodePortList, &subscription_manager, 10000, 100, canard_adapters));
+//	constexpr uint8_t GPIO_EXPANDER = 32;
+//	using PowerSwitchConfig = I2C_Register_Config<hi2c4, GPIO_EXPANDER>;
+//	using PowerSwitchTransport = I2CRegisterTransport<PowerSwitchConfig>;
+//	PowerSwitchTransport ps_transport;
+//	PowerSwitch<PowerSwitchTransport> power_switch(ps_transport, GPIOC, GPIO_POWER_RST_Pin);
+//    power_switch.releaseReset();
 
 	constexpr uint8_t uuid[] = {0x2b, 0x8c, 0xda, 0x5f, 0x91, 0x3e, 0x47, 0xa2, 0xb5, 0x07, 0x8f, 0xd3, 0x64, 0xe9, 0x1c, 0x70};
 	constexpr char node_name[50] = "AVIL496_CSAT";
-	O1HeapAllocator<TaskRespondGetInfo<Cyphal<CanardAdapter>>> alloc_TaskRespondGetInfo(o1heap);
-	registration_manager.add(allocate_unique_custom<TaskRespondGetInfo<Cyphal<CanardAdapter>>>(alloc_TaskRespondGetInfo, uuid, node_name, 10000, 100, canard_adapters));
 
-	O1HeapAllocator<TaskRequestGetInfo<Cyphal<CanardAdapter>>> alloc_TaskRequestGetInfo(o1heap);
-	registration_manager.add(allocate_unique_custom<TaskRequestGetInfo<Cyphal<CanardAdapter>>>(alloc_TaskRequestGetInfo, 10000, 100, 13, 0, canard_adapters));
+	using TSHeart = TaskSendHeartBeat<CanardCyphal>;
+	register_task_with_heap<TSHeart>(registration_manager, 2000, 100, 0, canard_adapters);
 
-	O1HeapAllocator<TaskBlinkLED> alloc_TaskBlinkLED(o1heap);
-	registration_manager.add(allocate_unique_custom<TaskBlinkLED>(alloc_TaskBlinkLED, LED1_GPIO_Port, LED1_Pin, 1000, 100));
+	using TPHeart = TaskProcessHeartBeat<CanardCyphal>;
+	register_task_with_heap<TPHeart>(registration_manager, 2000, 100, canard_adapters);
 
-	O1HeapAllocator<TaskCheckMemory> alloc_TaskCheckMemory(o1heap);
-	registration_manager.add(allocate_unique_custom<TaskCheckMemory>(alloc_TaskCheckMemory, o1heap, 2000, 100));
+	using TSendNodeList = TaskSendNodePortList<CanardCyphal>;
+	register_task_with_heap<TSendNodeList>(registration_manager, &registration_manager, 10000, 100, 0, canard_adapters);
 
+	using TSubscribeNodeList = TaskSubscribeNodePortList<CanardCyphal>;
+	register_task_with_heap<TSubscribeNodeList>(registration_manager, &subscription_manager, 10000, 100, canard_adapters);
 
-    power_switch.setState(0xff);
+	using TRespondInfo = TaskRespondGetInfo<CanardCyphal>;
+	register_task_with_heap<TRespondInfo>(registration_manager, uuid, node_name, 10000, 100, canard_adapters);
 
-	constexpr uint8_t INA226 = 64;
-	using MonitorConfig = I2C_Config<hi2c2, INA226>;
-    using MonitorTransport = I2CTransport<MonitorConfig>;
-    MonitorTransport monitor_transport;
-	PowerMonitor<MonitorTransport> power_monitor(monitor_transport);
+	using TRequestInfo = TaskRequestGetInfo<CanardCyphal>;
+	register_task_with_heap<TRequestInfo>(registration_manager, 10000, 100, 11, 0, canard_adapters);
 
-	constexpr MagnetometerCalibration aux_mmc_calibration = {
-	    { 3.19048657e+03f,  3.21802648e+03f, -1.86857329e+01f, },
-	    {{
-	        { 1.0f,	0.0f, 0.0f },
-	        { 0.0f, 1.0f, 0.0f },
-	        { 0.0f, 0.0f, 1.0f }
-	    }}
-	};
-	using IMUConfigType = SPI_Config<hspi2, GPIO_SPI2_GYRO_CS_Pin, 128>;
-	IMUConfigType imu_config(GPIOD);
-	SPITransport<IMUConfigType> imu_transport(imu_config);
-	BMI270_MMC5983<SPITransport<IMUConfigType>> imu(imu_transport, aux_mmc_calibration);
-	(void) imu.readChipID();
-	(void) imu.readChipID();
-	HAL_Delay(5000);
-	assert(imu.initialize());
-	assert(imu.configure());
+	using TBlink = TaskBlinkLED;
+	register_task_with_heap<TBlink>(registration_manager, GPIOB, LED1_Pin, 1000, 100);
 
+	using TCheckMem = TaskCheckMemory;
+	register_task_with_heap<TCheckMem>(registration_manager, o1heap, 2000, 100);
 
-	constexpr MagnetometerCalibration spi_mmc_calibration = {
-    { -4.78483917e+02f,  2.32297897e+03f,  6.76868257e+02f, },
-    {{
-	        { 1.0f,	0.0f, 0.0f },
-	        { 0.0f, 1.0f, 0.0f },
-	        { 0.0f, 0.0f, 1.0f }
-    }}
-	};
-	using MagConfigType = SPI_Config<hspi1, GPIO_SPI1_MAG_CS_Pin, 128>;
-	MagConfigType mag_config(GPIOE);
-	SPITransport<MagConfigType> mag_transport(mag_config);
-    MMC5983<SPITransport<MagConfigType>> mag(mag_transport, spi_mmc_calibration);
-	assert(mag.initialize());
-
-//	using MramConfig = SPI_Config<hspi3, &GPIOG_object, GPIO_SPI3_MRAM_CS_Pin, 128>;
-//    using MramTransport = SPITransport<MramConfig>;
-//    MramTransport mram_transport;
-//    MR25H10<MramTransport> mram(mram_transport);
-//    (void) mag.readChipID();
-
-	using OrientationTrackerType = AccGyrMagOrientationTracker<7,6>;
-	using IMUType = BMI270_MMC5983<SPITransport<IMUConfigType>>;
-	using OrientationType = AccGyrMagOrientation<OrientationTrackerType, IMUType, IMUType>;
-	using OrientationTask = TaskOrientationService<OrientationType, Cyphal<CanardAdapter>>;
-	OrientationTrackerType orientation_tracker;
-	OrientationType orientation(&hrtc, orientation_tracker, imu, imu);
-	O1HeapAllocator<OrientationTask> alloc_TaskOrientationService(o1heap);
-	registration_manager.add(
-	    allocate_unique_custom<OrientationTask>(alloc_TaskOrientationService, orientation, 100, 5, 0, canard_adapters)
-	);
-
-	using PositionTrackerType = PositionTracker9D;
-	using PositionType = GNSSandAccelPosition<PositionTrackerType, SimulatedGNSS, IMUType, OrientationType, SubtractGravityInNED>;
-	using PositionTask = TaskPositionService<PositionType, Cyphal<CanardAdapter>>;
-	SimulatedGNSS gnss(25);
-	PositionTrackerType position_tracker;
-	PositionType Position(&hrtc, position_tracker, gnss, imu, orientation, 100, 1);
-	O1HeapAllocator<PositionTask> alloc_TaskPositionService(o1heap);
-	registration_manager.add(
-	    allocate_unique_custom<PositionTask>(alloc_TaskPositionService, Position, 100, 5, 0, canard_adapters)
-	);
+//    power_switch.releaseReset();
+//    power_switch.on(GYRO_3V3);
+//    power_switch.on(MAG_3V3);
+//    power_switch.on(GPS_3V3);
+//
+//	constexpr uint8_t INA226 = 64;
+//	using PowerMonitorConfig = I2C_Register_Config<hi2c2, INA226>;
+//	using PowerMonitorTransport = I2CRegisterTransport<PowerMonitorConfig>;
+//	PowerMonitorTransport pm_transport;
+//	PowerMonitor<PowerMonitorTransport> power_monitor(pm_transport);
+//
+//	constexpr MagnetometerCalibration aux_mmc_calibration = {
+//	    { 3.19048657e+03f,  3.21802648e+03f, -1.86857329e+01f, },
+//	    {{
+//	        { 1.0f,	0.0f, 0.0f },
+//	        { 0.0f, 1.0f, 0.0f },
+//	        { 0.0f, 0.0f, 1.0f }
+//	    }}
+//	};
+//	using IMUConfigType = SPI_Register_Config<hspi2, GPIO_SPI2_GYRO_CS_Pin, 128>;
+//	IMUConfigType imu_config(GPIOD);
+//	SPIRegisterTransport<IMUConfigType> imu_transport(imu_config);
+//	BMI270_MMC5983<SPIRegisterTransport<IMUConfigType>> imu(imu_transport, aux_mmc_calibration);
+//	(void) imu.readChipID();
+//	(void) imu.readChipID();
+//	HAL_Delay(5000);
+//	assert(imu.initialize());
+//	assert(imu.configure());
+//
+//
+//	constexpr MagnetometerCalibration spi_mmc_calibration = {
+//    { -4.78483917e+02f,  2.32297897e+03f,  6.76868257e+02f, },
+//    {{
+//	        { 1.0f,	0.0f, 0.0f },
+//	        { 0.0f, 1.0f, 0.0f },
+//	        { 0.0f, 0.0f, 1.0f }
+//    }}
+//	};
+//	using MagConfigType = SPI_Register_Config<hspi1, GPIO_SPI1_MAG_CS_Pin, 128>;
+//	MagConfigType mag_config(GPIOE);
+//	SPIRegisterTransport<MagConfigType> mag_transport(mag_config);
+//    MMC5983<SPIRegisterTransport<MagConfigType>> mag(mag_transport, spi_mmc_calibration);
+//	assert(mag.initialize());
+//
+////	using MramConfig = SPI_Config<hspi3, &GPIOG_object, GPIO_SPI3_MRAM_CS_Pin, 128>;
+////    using MramTransport = SPITransport<MramConfig>;
+////    MramTransport mram_transport;
+////    MR25H10<MramTransport> mram(mram_transport);
+////    (void) mag.readChipID();
+//
+//	using OrientationTrackerType = AccGyrMagOrientationTracker<7,6>;
+//	using IMUType = BMI270_MMC5983<SPIRegisterTransport<IMUConfigType>>;
+//	using OrientationType = AccGyrMagOrientation<OrientationTrackerType, IMUType, IMUType>;
+//	using OrientationTask = TaskOrientationService<OrientationType, Cyphal<CanardAdapter>>;
+//	OrientationTrackerType orientation_tracker;
+//	OrientationType orientation(&hrtc, orientation_tracker, imu, imu);
+//	using OrientationTask = TaskOrientationService<OrientationType, Cyphal<CanardAdapter>>;
+//	register_task_with_heap<OrientationTask>(registration_manager, orientation, 100, 5, 0, canard_adapters);
+//
+//
+//	using PositionTrackerType = PositionTracker9D;
+//	using PositionType = GNSSandAccelPosition<PositionTrackerType, SimulatedGNSS, IMUType, OrientationType, SubtractGravityInNED>;
+//	using PositionTask = TaskPositionService<PositionType, Cyphal<CanardAdapter>>;
+//	SimulatedGNSS gnss(25);
+//	PositionTrackerType position_tracker;
+//	PositionType Position(&hrtc, position_tracker, gnss, imu, orientation, 100, 1);
+//	using PositionTask = TaskPositionService<PositionType, Cyphal<CanardAdapter>>;
+//	register_task_with_heap<PositionTask>(registration_manager, Position, 100, 5, 0, canard_adapters);
 
 	subscription_manager.subscribe<SubscriptionManager::MessageTag>(registration_manager.getSubscriptions(), canard_adapters);
     subscription_manager.subscribe<SubscriptionManager::ResponseTag>(registration_manager.getServers(), canard_adapters);
@@ -279,8 +272,9 @@ void cppmain()
     ServiceManager service_manager(registration_manager.getHandlers());
 	service_manager.initializeServices(HAL_GetTick());
 
-    O1HeapAllocator<CyphalTransfer> allocator(o1heap);
+	static SafeAllocator<CyphalTransfer, LocalHeap> allocator;
 	LoopManager loop_manager(allocator);
+
 	while(1)
 	{
 		loop_manager.CanProcessTxQueue(&canard_adapter, &hcan1);
